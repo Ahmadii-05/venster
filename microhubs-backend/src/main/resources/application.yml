@@ -3,23 +3,23 @@ spring:
     name: microhubs-backend
 
   datasource:
-    url: jdbc:postgresql://127.0.0.1:5432/microhubs
-    username: postgres
-    password: 041410
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://127.0.0.1:5432/microhubs}
+    username: ${SPRING_DATASOURCE_USERNAME:microhubs}
+    password: ${SPRING_DATASOURCE_PASSWORD:password}
 
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     show-sql: true
     properties:
       hibernate:
         format_sql: true
 
 server:
-  port: 8083
+  port: 8082
 
 jwt:
-  secret: mySecretKeyForJwtTokenGenerationThatIsLongEnoughForHmacSha256Algorithm12345
+  secret: ${JWT_SECRET:default-secret-change-in-production}
 
 springdoc:
   api-docs:

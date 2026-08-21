@@ -3,6 +3,8 @@ package com.microhubs.security;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import io.jsonwebtoken.io.Decoders;
+import io.jsonwebtoken.security.SignatureException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
@@ -22,6 +24,7 @@ public class JwtUtil {
     private static final long JWT_EXPIRATION = 1000 * 60 * 60 * 10; // 10 hours
 
     private SecretKey getSigningKey() {
+        // ensure we handle base64 or raw key lengths
         return Keys.hmacShaKeyFor(jwtSecret.getBytes());
     }
 

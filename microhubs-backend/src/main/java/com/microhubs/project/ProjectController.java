@@ -1,6 +1,7 @@
 package com.microhubs.project;
 
 import com.microhubs.common.ApiResponse;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -18,7 +19,7 @@ public class ProjectController {
     private ProjectService projectService;
 
     @PostMapping
-    public ResponseEntity<ApiResponse<Project>> createProject(@RequestBody ProjectRequest request, @RequestParam UUID workspaceId) {
+    public ResponseEntity<ApiResponse<Project>> createProject(@Valid @RequestBody ProjectRequest request, @RequestParam UUID workspaceId) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         String email = auth.getName();
         ApiResponse<Project> response = projectService.createProject(workspaceId, email, request);

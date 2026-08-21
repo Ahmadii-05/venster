@@ -2,9 +2,7 @@ package com.microhubs.workspace;
 
 import com.microhubs.common.ApiResponse;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -14,40 +12,130 @@ import java.util.UUID;
 @RequestMapping("/api/workspaces")
 public class WorkspaceController {
 
-    @Autowired
-    private WorkspaceService workspaceService;
+    private final WorkspaceService workspaceService;
 
+    public WorkspaceController(WorkspaceService workspaceService) {
+        this.workspaceService = workspaceService;
+    }
+
+    /**
+     * Create workspace.
+     *
+     * Authenticated user automatically becomes OWNER.
+     */
     @PostMapping
-    public ApiResponse<Workspace> createWorkspace(@Valid @RequestBody WorkspaceRequest request) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        String email = auth.getName();
+    public ApiResponse<Workspace> createWorkspace(
+            @Valid @RequestBody WorkspaceRequest request,
+            Authentication authentication) {
 
-        Workspace workspace = workspaceService.createWorkspace(request.getName(), email);
+        String email = authentication.getName();
+
+        Workspace workspace =
+                workspaceService.createWorkspace(
+                        request.getName(),
+                        email
+                );
+
         return ApiResponse.success(workspace);
     }
 
+    /**
+     * List workspaces belonging to current user.
+     */
     @GetMapping
-    public ApiResponse<List<Workspace>> listWorkspaces() {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        String email = auth.getName();
+    public ApiResponse<List<Workspace>> listWorkspaces(
+            Authentication authentication) {
 
-        List<Workspace> workspaces = workspaceService.getUserWorkspaces(email);
+        String email = authentication.getName();
+
+        List<Workspace> workspaces =
+                workspaceService.getUserWorkspaces(email);
+
         return ApiResponse.success(workspaces);
     }
 
-    @PostMapping("/{id}/members")
-    public ApiResponse<WorkspaceMember> addMember(@PathVariable UUID id, @Valid @RequestBody MemberRequest request) {
-        workspaceService.addMember(id, request.getEmail(), request.getRole());
+    /**
+     * Get a specific workspace.
+     *
+     * Non-members receive 403.
+     */
+    @GetMapping("/{id}")
+    public ApiResponse<Workspace> getWorkspace(
+            @PathVariable UUID id,
+            Authentication authentication) {
 
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        String email = auth.getName();
-        WorkspaceMember member = workspaceService.getMember(id, request.getEmail());
+        String email = authentication.getName();
+
+        Workspace workspace =
+                workspaceService.getWorkspace(id, email);
+
+        return ApiResponse.success(workspace);
+    }
+
+    /**
+     * Add a member.
+     *
+     * Only OWNER/ADMIN can perform this operation.
+     */
+    @PostMapping("/{id}/members")
+    public ApiResponse<WorkspaceMember> addMember(
+            @PathVariable UUID id,
+            @Valid @RequestBody MemberRequest request,
+            Authentication authentication) {
+
+        String requesterEmail = authentication.getName();
+
+        WorkspaceMember member =
+                workspaceService.addMember(
+                        id,
+                        requesterEmail,
+                        request.getEmail(),
+                        request.getRole()
+                );
+
         return ApiResponse.success(member);
     }
 
+    /**
+     * Remove a member.
+     *
+     * Only OWNER/ADMIN can perform this operation.
+     */
     @DeleteMapping("/{id}/members/{email}")
-    public ApiResponse<Void> removeMember(@PathVariable UUID id, @PathVariable String email) {
-        workspaceService.removeMember(id, email);
+    public ApiResponse<Void> removeMember(
+            @PathVariable UUID id,
+            @PathVariable String email,
+            Authentication authentication) {
+
+        String requesterEmail = authentication.getName();
+
+        workspaceService.removeMember(
+                id,
+                requesterEmail,
+                email
+        );
+
         return ApiResponse.success(null);
+    }
+
+    /**
+     * Get a workspace member.
+     */
+    @GetMapping("/{id}/members/{email}")
+    public ApiResponse<WorkspaceMember> getMember(
+            @PathVariable UUID id,
+            @PathVariable String email,
+            Authentication authentication) {
+
+        String requesterEmail = authentication.getName();
+
+        WorkspaceMember member =
+                workspaceService.getMember(
+                        id,
+                        requesterEmail,
+                        email
+                );
+
+        return ApiResponse.success(member);
     }
 }

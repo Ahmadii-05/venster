@@ -1,6 +1,5 @@
 package com.microhubs.project;
 
-import com.microhubs.auth.User;
 import com.microhubs.common.BaseEntity;
 import com.microhubs.workspace.Workspace;
 import jakarta.persistence.*;
@@ -13,9 +12,7 @@ public class Project extends BaseEntity {
     @JoinColumn(name = "workspace_id", nullable = false)
     private Workspace workspace;
 
-    @ManyToOne
-    @JoinColumn(name = "created_by", nullable = false)
-    private User createdBy;
+    // schema does not include a created_by on projects; created_by handled at service level if needed
 
     @Column(nullable = false)
     private String name;
@@ -28,8 +25,7 @@ public class Project extends BaseEntity {
     public Workspace getWorkspace() { return workspace; }
     public void setWorkspace(Workspace workspace) { this.workspace = workspace; }
 
-    public User getCreatedBy() { return createdBy; }
-    public void setCreatedBy(User createdBy) { this.createdBy = createdBy; }
+    // no createdBy getter/setter to match database schema
 
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }

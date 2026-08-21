@@ -2,6 +2,7 @@ package com.microhubs.auth;
 
 import com.microhubs.common.BaseEntity;
 import jakarta.persistence.*;
+import jakarta.persistence.Transient;
 
 @Entity
 @Table(name = "users")
@@ -10,17 +11,15 @@ public class User extends BaseEntity {
     @Column(unique = true, nullable = false)
     private String email;
 
-    @Column(nullable = false)
+    @Column(name = "password_hash", nullable = false)
     private String passwordHash;
 
-    @Column(nullable = false)
     private String name;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Transient
     private Role role;
 
-    public User() {}
+    public User() { this.role = Role.MEMBER; }
 
     public String getEmail() { return email; }
     public void setEmail(String email) { this.email = email; }
