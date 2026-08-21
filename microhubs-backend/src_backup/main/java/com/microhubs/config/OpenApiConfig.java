@@ -1,0 +1,25 @@
+package com.microhubs.config;
+
+import io.swagger.v3.oas.models.Info;
+import io.swagger.v3.oas.models.OpenAPI;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class OpenApiConfig {
+
+    @Bean
+    public OpenAPI api() {
+        return new OpenAPI()
+                .info(new Info()
+                        .title("MicroHubs API")
+                        .version("v1")
+                        .description("Workflow-Embedded Micro-Hubs API"));
+    }
+}
+</task_progress>
+- [x] OpenApiConfig created
+</task_progress>
+</write_to_file>
+
+</final_file_content>
