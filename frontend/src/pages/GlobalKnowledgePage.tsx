@@ -26,47 +26,53 @@ export default function GlobalKnowledgePage() {
   if (selected) {
     return (
       <div className="max-w-4xl mx-auto p-6">
-        <button onClick={() => setSelected(null)} className="text-blue-600 hover:underline mb-4">
+        <button onClick={() => setSelected(null)} className="text-xs font-medium mb-4 transition-all hover:opacity-80" style={{ color: "var(--color-accent)" }}>
           ← Back to search results
         </button>
-        <div className="bg-white rounded-lg shadow p-6">
+        <div className="rounded-xl p-6 border transition-theme" style={{ backgroundColor: "var(--color-bg-card)", borderColor: "var(--color-border)" }}>
           <div className="flex items-center gap-2 mb-2">
-            <h1 className="text-2xl font-bold">{selected.title}</h1>
-            <span className="px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-800">
+            <h1 className="text-xl font-bold" style={{ color: "var(--color-text-primary)" }}>{selected.title}</h1>
+            <span
+              className="px-2 py-0.5 rounded-full text-xs font-medium"
+              style={{ backgroundColor: "rgba(34,197,94,0.15)", color: "var(--color-status-resolved)" }}
+            >
               PUBLIC
             </span>
           </div>
           {selected.category && (
-            <span className="inline-block px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800 mb-3">
+            <span
+              className="inline-block px-2 py-0.5 rounded-full text-xs font-medium mb-3"
+              style={{ backgroundColor: "rgba(167,139,250,0.15)", color: "var(--color-status-answered)" }}
+            >
               {selected.category}
             </span>
           )}
           <div className="space-y-4 mt-4">
             <div>
-              <h3 className="font-semibold text-gray-700">Summary</h3>
-              <p className="text-gray-600">{selected.summary}</p>
+              <h3 className="text-xs uppercase tracking-widest font-mono mb-1" style={{ color: "var(--color-kicker)" }}>Summary</h3>
+              <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>{selected.summary}</p>
             </div>
             <div>
-              <h3 className="font-semibold text-gray-700">Root Cause</h3>
-              <p className="text-gray-600">{selected.rootCause}</p>
+              <h3 className="text-xs uppercase tracking-widest font-mono mb-1" style={{ color: "var(--color-kicker)" }}>Root Cause</h3>
+              <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>{selected.rootCause}</p>
             </div>
             <div>
-              <h3 className="font-semibold text-gray-700">Solution</h3>
-              <p className="text-gray-600">{selected.solution}</p>
+              <h3 className="text-xs uppercase tracking-widest font-mono mb-1" style={{ color: "var(--color-kicker)" }}>Solution</h3>
+              <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>{selected.solution}</p>
             </div>
             {selected.tags && selected.tags.length > 0 && (
               <div>
-                <h3 className="font-semibold text-gray-700">Tags</h3>
+                <h3 className="text-xs uppercase tracking-widest font-mono mb-1" style={{ color: "var(--color-kicker)" }}>Tags</h3>
                 <div className="flex flex-wrap gap-1 mt-1">
                   {selected.tags.map((tag, i) => (
-                    <span key={i} className="px-2 py-0.5 bg-gray-100 rounded text-sm text-gray-600">
+                    <span key={i} className="px-2 py-0.5 rounded text-xs" style={{ backgroundColor: "var(--color-bg-input)", color: "var(--color-text-muted)" }}>
                       {tag}
                     </span>
                   ))}
                 </div>
               </div>
             )}
-            <div className="text-sm text-gray-400">
+            <div className="text-xs" style={{ color: "var(--color-text-muted)" }}>
               Confidence: {Math.round((selected.confidence || 0) * 100)}%
             </div>
           </div>
@@ -76,74 +82,94 @@ export default function GlobalKnowledgePage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
-      <h1 className="text-2xl font-bold mb-2">🌍 Global Knowledge Search</h1>
-      <p className="text-gray-500 mb-6">
-        Search publicly shared knowledge across all teams. No workspace required.
-      </p>
+    <div className="p-6 max-w-5xl mx-auto space-y-6">
+      {/* Header */}
+      <div>
+        <div className="text-[10px] uppercase tracking-widest font-mono mb-1" style={{ color: "var(--color-accent)" }}>
+          GLOBAL
+        </div>
+        <h1 className="text-2xl font-bold" style={{ color: "var(--color-text-primary)" }}>
+          Global Knowledge Search
+        </h1>
+        <p className="text-sm mt-1" style={{ color: "var(--color-text-secondary)" }}>
+          Search publicly shared knowledge across all teams. No workspace required.
+        </p>
+      </div>
 
-      <div className="flex gap-2 mb-6">
+      <div className="flex gap-2">
         <input
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleSearch()}
           placeholder="Search knowledge... (e.g., 'how to handle null references')"
-          className="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="flex-1 rounded-lg px-4 py-2.5 text-sm border outline-none focus:ring-1 transition-theme"
+          style={{
+            backgroundColor: "var(--color-bg-input)",
+            borderColor: "var(--color-border)",
+            color: "var(--color-text-primary)",
+          }}
         />
         <button
           onClick={handleSearch}
           disabled={loading}
-          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+          className="px-6 py-2.5 rounded-lg text-sm font-medium border transition-all hover:opacity-90 disabled:opacity-50"
+          style={{ backgroundColor: "var(--color-accent)", borderColor: "var(--color-accent)", color: "#000" }}
         >
           {loading ? "Searching..." : "Search"}
         </button>
       </div>
 
       {!searched && (
-        <div className="text-center text-gray-400 py-12">
-          <p className="text-lg">Enter a query to search the global knowledge base</p>
-          <p className="text-sm mt-2">
-            Results come from resolved capsules published by workspace admins
-          </p>
+        <div className="text-center py-12" style={{ color: "var(--color-text-muted)" }}>
+          <p className="text-sm mb-1" style={{ color: "var(--color-text-secondary)" }}>Enter a query to search the global knowledge base</p>
+          <p className="text-xs">Results come from resolved capsules published by workspace admins</p>
         </div>
       )}
 
       {searched && results.length === 0 && !loading && (
-        <div className="text-center text-gray-400 py-12">
-          <p>No public knowledge items found for "{query}"</p>
+        <div className="text-center py-12" style={{ color: "var(--color-text-muted)" }}>
+          <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>No public knowledge items found for "{query}"</p>
         </div>
       )}
 
-      <div className="space-y-3">
+      <div className="space-y-2">
         {results.map((item) => (
-          <div
+          <button
             key={item.id}
             onClick={() => setSelected(item)}
-            className="bg-white rounded-lg shadow p-4 hover:shadow-md cursor-pointer transition"
+            className="w-full text-left rounded-xl p-4 border transition-all hover:opacity-90"
+            style={{ backgroundColor: "var(--color-bg-card)", borderColor: "var(--color-border)" }}
           >
-            <div className="flex items-center gap-2">
-              <h3 className="font-semibold">{item.title}</h3>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>📖</span>
+              <h3 className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>{item.title}</h3>
               {item.category && (
-                <span className="px-2 py-0.5 rounded text-xs bg-blue-100 text-blue-800">
+                <span
+                  className="px-2 py-0.5 rounded-full text-xs font-medium"
+                  style={{ backgroundColor: "rgba(167,139,250,0.15)", color: "var(--color-status-answered)" }}
+                >
                   {item.category}
                 </span>
               )}
-              <span className="px-2 py-0.5 rounded text-xs bg-green-100 text-green-800">
+              <span
+                className="px-2 py-0.5 rounded-full text-xs font-medium"
+                style={{ backgroundColor: "rgba(34,197,94,0.15)", color: "var(--color-status-resolved)" }}
+              >
                 PUBLIC
               </span>
             </div>
-            <p className="text-sm text-gray-500 mt-1 line-clamp-2">{item.summary}</p>
+            <p className="text-xs line-clamp-2 mt-1" style={{ color: "var(--color-text-secondary)" }}>{item.summary}</p>
             {item.tags && item.tags.length > 0 && (
               <div className="flex flex-wrap gap-1 mt-2">
                 {item.tags.slice(0, 5).map((tag, i) => (
-                  <span key={i} className="px-1.5 py-0.5 bg-gray-100 rounded text-xs text-gray-500">
+                  <span key={i} className="px-1.5 py-0.5 rounded text-[10px]" style={{ backgroundColor: "var(--color-bg-input)", color: "var(--color-text-muted)" }}>
                     {tag}
                   </span>
                 ))}
               </div>
             )}
-          </div>
+          </button>
         ))}
       </div>
     </div>

@@ -70,7 +70,7 @@ export default function NotificationsPage() {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <div className="text-xs uppercase tracking-widest font-mono mb-1" style={{ color: "var(--color-accent)" }}>
+          <div className="text-[10px] uppercase tracking-widest font-mono mb-1" style={{ color: "var(--color-accent)" }}>
             INBOX
           </div>
           <h1 className="text-2xl font-bold" style={{ color: "var(--color-text-primary)" }}>
@@ -167,8 +167,8 @@ export default function NotificationsPage() {
                   {!n.read && (
                     <button
                       onClick={() => handleMarkAsRead(n.id)}
-                      className="px-2 py-1 rounded text-[10px] font-medium transition-all hover:opacity-80"
-                      style={{ backgroundColor: "var(--color-bg-input)", color: "var(--color-text-muted)" }}
+                      className="px-2 py-1 rounded text-[10px] font-medium border transition-all hover:opacity-80"
+                      style={{ backgroundColor: "var(--color-bg-input)", borderColor: "var(--color-border)", color: "var(--color-text-muted)" }}
                     >
                       Mark read
                     </button>

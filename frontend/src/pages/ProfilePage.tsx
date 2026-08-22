@@ -23,11 +23,9 @@ export default function ProfilePage() {
   useEffect(() => {
     const load = async () => {
       try {
-        // Load workspaces
         const ws = await workspaceApi.list();
         setWorkspaces(ws || []);
 
-        // Load assigned capsules from all projects
         const allCaps: Capsule[] = [];
         for (const w of ws || []) {
           try {
@@ -38,11 +36,9 @@ export default function ProfilePage() {
             }
           } catch {}
         }
-        // Filter to capsules assigned to current user
         const myAssigned = allCaps.filter((c) => c.reviewer?.email === email);
         setAssignedCapsules(myAssigned.slice(0, 5));
 
-        // Load knowledge items
         if (ws && ws.length > 0) {
           try {
             const ki = await knowledgeApi.search({ q: "a", workspaceId: ws[0].id });
@@ -59,10 +55,7 @@ export default function ProfilePage() {
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
       {/* Header Card */}
-      <div
-        className="rounded-xl p-6 border transition-theme"
-        style={{ backgroundColor: "var(--color-bg-card)", borderColor: "var(--color-border)" }}
-      >
+      <div className="rounded-xl p-6 border transition-theme" style={{ backgroundColor: "var(--color-bg-card)", borderColor: "var(--color-border)" }}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div
@@ -72,7 +65,7 @@ export default function ProfilePage() {
               {initials}
             </div>
             <div>
-              <div className="text-xs uppercase tracking-widest font-mono mb-0.5" style={{ color: "var(--color-accent)" }}>
+              <div className="text-[10px] uppercase tracking-widest font-mono mb-0.5" style={{ color: "var(--color-accent)" }}>
                 ACCOUNT
               </div>
               <h1 className="text-xl font-bold" style={{ color: "var(--color-text-primary)" }}>
@@ -85,7 +78,7 @@ export default function ProfilePage() {
           </div>
           <button
             onClick={logout}
-            className="px-4 py-2 rounded-lg text-sm font-medium border transition-all hover:opacity-80"
+            className="px-4 py-2 rounded-lg text-xs font-medium border transition-all hover:opacity-80"
             style={{ borderColor: "var(--color-border)", color: "var(--color-danger)" }}
           >
             Logout
@@ -132,7 +125,7 @@ export default function ProfilePage() {
 
       {/* Assigned Capsules */}
       <div>
-        <div className="text-xs uppercase tracking-widest font-mono mb-3" style={{ color: "var(--color-text-muted)" }}>
+        <div className="text-[10px] uppercase tracking-widest font-mono mb-3" style={{ color: "var(--color-text-muted)" }}>
           ASSIGNED TO YOU
         </div>
         {assignedCapsules.length === 0 ? (
@@ -175,7 +168,7 @@ export default function ProfilePage() {
                         {cap.artifactAnchor?.artifactVersion?.artifact?.filePath?.split("/").pop()}
                       </div>
                     </div>
-                    <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+                    <span className="text-[10px] ml-3" style={{ color: "var(--color-text-muted)" }}>
                       {new Date(cap.createdAt).toLocaleDateString()}
                     </span>
                   </div>
@@ -188,7 +181,7 @@ export default function ProfilePage() {
 
       {/* Knowledge Items */}
       <div>
-        <div className="text-xs uppercase tracking-widest font-mono mb-3" style={{ color: "var(--color-text-muted)" }}>
+        <div className="text-[10px] uppercase tracking-widest font-mono mb-3" style={{ color: "var(--color-text-muted)" }}>
           KNOWLEDGE YOU WROTE
         </div>
         {knowledgeItems.length === 0 ? (
@@ -240,7 +233,7 @@ export default function ProfilePage() {
 
       {/* Workspaces */}
       <div>
-        <div className="text-xs uppercase tracking-widest font-mono mb-3" style={{ color: "var(--color-text-muted)" }}>
+        <div className="text-[10px] uppercase tracking-widest font-mono mb-3" style={{ color: "var(--color-text-muted)" }}>
           YOUR WORKSPACES
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

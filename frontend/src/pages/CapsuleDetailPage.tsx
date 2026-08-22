@@ -41,12 +41,10 @@ export default function CapsuleDetailPage() {
       setCapsule(cap);
       setComments(comms);
 
-      // Fetch resolution if resolved
       if (cap.status === "RESOLVED") {
         try {
           const res = await capsuleApi.getResolution(id);
           setResolution(res);
-          // Poll for knowledge item (may take a few seconds to generate)
           setKnowledgeLoading(true);
           const pollKnowledge = async (attempts = 0) => {
             try {
@@ -70,7 +68,6 @@ export default function CapsuleDetailPage() {
         }
       }
 
-      // Fetch current user's workspace membership for resolve permission
       const workspaceId =
         cap.artifactAnchor?.artifactVersion?.artifact?.project?.workspace?.id;
       if (workspaceId && currentEmail) {
@@ -92,8 +89,6 @@ export default function CapsuleDetailPage() {
     fetchAll();
   }, [fetchAll]);
 
-  // Determine if current user can see the resolve button
-  // Matches backend: reviewer OR workspace ADMIN/OWNER
   const isReviewer = capsule?.reviewer?.email === currentEmail;
   const isWorkspaceAdminOrOwner =
     membership?.role === "ADMIN" || membership?.role === "OWNER";
@@ -118,7 +113,6 @@ export default function CapsuleDetailPage() {
       const comment = await capsuleApi.postComment(id, newComment);
       setComments((prev) => [...prev, comment]);
       setNewComment("");
-      // Refresh capsule to get status change
       const updated = await capsuleApi.get(id);
       setCapsule(updated);
     } catch (err: any) {
@@ -150,9 +144,7 @@ export default function CapsuleDetailPage() {
     setAssigning(true);
     try {
       const updated = await capsuleApi.update(id, {
-        reviewerId: assigneeEmail, // The backend expects reviewerId as UUID, but we'll send the email
-        // Actually looking at the API, it expects reviewerId as UUID
-        // We need to handle this differently - for now we'll use the input as-is
+        reviewerId: assigneeEmail,
       });
       setCapsule(updated);
       setAssigneeEmail("");
@@ -163,113 +155,119 @@ export default function CapsuleDetailPage() {
     }
   };
 
-  // Get valid next transitions for current status
   const validTransitions = capsule
     ? ALLOWED_TRANSITIONS[capsule.status]
     : [];
 
-  if (loading) return <div className="text-gray-500 text-sm">Loading...</div>;
+  if (loading) return <div className="text-sm text-center py-12" style={{ color: "var(--color-text-muted)" }}>Loading...</div>;
   if (!capsule)
-    return <div className="text-gray-500 text-sm">Capsule not found</div>;
+    return <div className="text-sm text-center py-12" style={{ color: "var(--color-text-muted)" }}>Capsule not found</div>;
 
   const anchor = capsule.artifactAnchor;
   const artifact = anchor?.artifactVersion?.artifact;
 
   return (
-    <div className="max-w-4xl mx-auto">
-      <div className="mb-6">
-        <Link
-          to={artifact ? `/projects/${artifact.project.id}` : "/"}
-          className="text-sm text-blue-600 hover:underline"
-        >
-          ← Back to Project
-        </Link>
+    <div className="p-6 max-w-4xl mx-auto space-y-4">
+      {/* Header */}
+      <div className="flex items-start justify-between">
+        <div>
+          <Link
+            to={artifact ? `/projects/${artifact.project.id}` : "/"}
+            className="text-xs font-medium mb-2 inline-block transition-all hover:opacity-80"
+            style={{ color: "var(--color-accent)" }}
+          >
+            ← Back to Project
+          </Link>
+          <div className="text-[10px] uppercase tracking-widest font-mono mb-1" style={{ color: "var(--color-accent)" }}>
+            CAPSULE
+          </div>
+          <h1 className="text-xl font-bold" style={{ color: "var(--color-text-primary)" }}>
+            {capsule.title}
+          </h1>
+          <p className="text-xs mt-1" style={{ color: "var(--color-text-muted)" }}>
+            Created by {capsule.author?.name || capsule.author?.email} •{" "}
+            {new Date(capsule.createdAt).toLocaleString()}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <span
+            className="px-3 py-1 rounded-full text-xs font-medium"
+            style={{
+              backgroundColor: STATUS_COLORS[capsule.status]?.bg || "var(--color-bg-input)",
+              color: STATUS_COLORS[capsule.status]?.text || "var(--color-text-secondary)",
+            }}
+          >
+            {capsule.status.replace("_", " ")}
+          </span>
+          <span
+            className="px-2 py-0.5 rounded-full text-xs font-medium"
+            style={{
+              color: capsule.priority === "CRITICAL"
+                ? "var(--color-priority-high)"
+                : capsule.priority === "HIGH"
+                ? "var(--color-priority-high)"
+                : capsule.priority === "MEDIUM"
+                ? "var(--color-priority-medium)"
+                : "var(--color-priority-low)",
+            }}
+          >
+            {capsule.priority}
+          </span>
+        </div>
       </div>
 
       {error && (
-        <div className="bg-red-50 text-red-700 p-3 rounded-lg mb-4 text-sm">
-          {error}
+        <div className="rounded-lg p-3 border text-sm flex items-center justify-between" style={{ backgroundColor: "rgba(239,68,68,0.1)", borderColor: "var(--color-danger)", color: "var(--color-danger)" }}>
+          <span>{error}</span>
           <button
             onClick={() => setError("")}
-            className="ml-2 text-red-500 hover:underline"
+            className="text-xs underline"
+            style={{ color: "var(--color-danger)" }}
           >
             dismiss
           </button>
         </div>
       )}
 
-      {/* Header */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6 mb-4">
-        <div className="flex items-start justify-between">
-          <div>
-            <h1 className="text-xl font-bold text-gray-800">{capsule.title}</h1>
-            <p className="text-sm text-gray-500 mt-1">
-              Created by {capsule.author?.name || capsule.author?.email} •{" "}
-              {new Date(capsule.createdAt).toLocaleString()}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <span
-              className={`px-3 py-1 rounded-full text-sm font-medium ${STATUS_COLORS[capsule.status]}`}
-            >
-              {capsule.status}
+      {/* Artifact anchor context */}
+      {anchor && (
+        <div className="rounded-xl p-4 border transition-theme" style={{ backgroundColor: "var(--color-bg-card)", borderColor: "var(--color-border)" }}>
+          <div className="flex items-center gap-2 text-xs mb-2" style={{ color: "var(--color-text-secondary)" }}>
+            <span className="font-mono px-2 py-0.5 rounded" style={{ backgroundColor: "var(--color-bg-input)", color: "var(--color-text-muted)" }}>
+              📄 {artifact?.filePath}
             </span>
-            <span
-              className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                capsule.priority === "CRITICAL"
-                  ? "bg-red-100 text-red-700"
-                  : capsule.priority === "HIGH"
-                  ? "bg-orange-100 text-orange-700"
-                  : capsule.priority === "MEDIUM"
-                  ? "bg-yellow-100 text-yellow-700"
-                  : "bg-gray-100 text-gray-600"
-              }`}
-            >
-              {capsule.priority}
-            </span>
-          </div>
-        </div>
-
-        {/* Artifact anchor context */}
-        {anchor && (
-          <div className="mt-4 bg-gray-50 rounded-lg p-4 border border-gray-200">
-            <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">
-              <span className="font-mono text-xs bg-gray-200 px-2 py-0.5 rounded">
-                📄 {artifact?.filePath}
+            {anchor.startLine != null && (
+              <span className="text-[10px]" style={{ color: "var(--color-text-muted)" }}>
+                L{anchor.startLine}–L{anchor.endLine}
               </span>
-              {anchor.startLine != null && (
-                <span className="text-xs text-gray-500">
-                  L{anchor.startLine}–L{anchor.endLine}
-                </span>
-              )}
-              {anchor.symbolName && (
-                <span className="text-xs text-purple-600 font-medium">
-                  ƒ {anchor.symbolName}
-                </span>
-              )}
-            </div>
-            {anchor.selectedText && (
-              <pre className="text-xs text-gray-700 bg-gray-100 rounded p-3 overflow-x-auto border border-gray-200 font-mono">
-                {anchor.selectedText}
-              </pre>
+            )}
+            {anchor.symbolName && (
+              <span className="text-[10px] font-medium" style={{ color: "var(--color-status-answered)" }}>
+                ƒ {anchor.symbolName}
+              </span>
             )}
           </div>
-        )}
-      </div>
+          {anchor.selectedText && (
+            <pre className="text-xs rounded p-3 overflow-x-auto border" style={{ backgroundColor: "var(--color-bg-input)", borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}>
+              {anchor.selectedText}
+            </pre>
+          )}
+        </div>
+      )}
 
       {/* Reviewer & Actions */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
+      <div className="rounded-xl p-4 border transition-theme" style={{ backgroundColor: "var(--color-bg-card)", borderColor: "var(--color-border)" }}>
         <div className="flex items-center justify-between flex-wrap gap-3">
-          <div className="text-sm text-gray-600">
+          <div className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
             {capsule.reviewer ? (
               <span>
                 👤 Reviewer:{" "}
-                <span className="font-medium">
+                <span className="font-medium" style={{ color: "var(--color-text-primary)" }}>
                   {capsule.reviewer.name || capsule.reviewer.email}
                 </span>
               </span>
             ) : (
-              <span className="text-gray-400">No reviewer assigned</span>
+              <span style={{ color: "var(--color-text-muted)" }}>No reviewer assigned</span>
             )}
           </div>
 
@@ -281,9 +279,10 @@ export default function CapsuleDetailPage() {
                   <button
                     key={s}
                     onClick={() => handleStatusChange(s)}
-                    className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-200 transition-colors"
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium border transition-all hover:opacity-80"
+                    style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)", backgroundColor: "var(--color-bg-input)" }}
                   >
-                    → {s}
+                    → {s.replace("_", " ")}
                   </button>
                 ))}
               </div>
@@ -296,22 +295,25 @@ export default function CapsuleDetailPage() {
                 placeholder="Assign reviewer (email)"
                 value={assigneeEmail}
                 onChange={(e) => setAssigneeEmail(e.target.value)}
-                className="border border-gray-300 rounded-lg px-2 py-1 text-xs w-48 focus:ring-2 focus:ring-blue-500 outline-none"
+                className="rounded-lg px-2 py-1 text-xs border outline-none focus:ring-1 transition-theme w-40"
+                style={{ backgroundColor: "var(--color-bg-input)", borderColor: "var(--color-border)", color: "var(--color-text-primary)" }}
               />
               <button
                 onClick={handleAssignReviewer}
                 disabled={!assigneeEmail || assigning}
-                className="bg-gray-100 text-gray-700 px-2 py-1 rounded-lg text-xs font-medium hover:bg-gray-200 disabled:opacity-50"
+                className="px-2 py-1 rounded-lg text-xs font-medium border transition-all hover:opacity-80 disabled:opacity-50"
+                style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)", backgroundColor: "var(--color-bg-input)" }}
               >
                 Assign
               </button>
             </div>
 
-            {/* Resolve button - visible when ANSWERED and user is reviewer OR workspace ADMIN/OWNER */}
+            {/* Resolve button */}
             {canResolve && (
               <button
                 onClick={() => setShowResolve(!showResolve)}
-                className="bg-green-600 text-white px-4 py-1.5 rounded-lg text-sm font-medium hover:bg-green-700"
+                className="px-4 py-1.5 rounded-lg text-xs font-medium border transition-all hover:opacity-90"
+                style={{ backgroundColor: "var(--color-status-resolved)", borderColor: "var(--color-status-resolved)", color: "#000" }}
               >
                 ✓ Resolve
               </button>
@@ -321,18 +323,20 @@ export default function CapsuleDetailPage() {
 
         {/* Resolve form */}
         {showResolve && (
-          <div className="mt-3 border-t border-gray-100 pt-3">
+          <div className="mt-3 border-t pt-3" style={{ borderColor: "var(--color-border)" }}>
             <textarea
               placeholder="Describe the final solution..."
               value={resolveSolution}
               onChange={(e) => setResolveSolution(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 outline-none resize-none"
+              className="w-full rounded-lg px-3 py-2 text-sm border outline-none focus:ring-1 transition-theme resize-none"
               rows={3}
+              style={{ backgroundColor: "var(--color-bg-input)", borderColor: "var(--color-border)", color: "var(--color-text-primary)" }}
             />
             <button
               onClick={handleResolve}
               disabled={!resolveSolution.trim() || resolving}
-              className="mt-2 bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50"
+              className="mt-2 px-4 py-2 rounded-lg text-sm font-medium border transition-all hover:opacity-90 disabled:opacity-50"
+              style={{ backgroundColor: "var(--color-status-resolved)", borderColor: "var(--color-status-resolved)", color: "#000" }}
             >
               {resolving ? "Resolving..." : "Confirm Resolution"}
             </button>
@@ -341,12 +345,14 @@ export default function CapsuleDetailPage() {
 
         {/* Show resolution if resolved */}
         {resolution && (
-          <div className="mt-3 border-t border-gray-100 pt-3">
-            <h4 className="text-sm font-medium text-green-700 mb-1">
-              ✓ Resolution
-            </h4>
-            <p className="text-sm text-gray-600">{resolution.finalSolution}</p>
-            <p className="text-xs text-gray-400 mt-1">
+          <div className="mt-3 border-t pt-3" style={{ borderColor: "var(--color-border)" }}>
+            <div className="flex items-center gap-2 mb-1">
+              <h4 className="text-sm font-medium" style={{ color: "var(--color-status-resolved)" }}>
+                ✓ Resolution
+              </h4>
+            </div>
+            <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>{resolution.finalSolution}</p>
+            <p className="text-[10px] mt-1" style={{ color: "var(--color-text-muted)" }}>
               Resolved by {resolution.resolver?.name || resolution.resolver?.email} •{" "}
               {new Date(resolution.resolvedAt).toLocaleString()}
             </p>
@@ -355,7 +361,8 @@ export default function CapsuleDetailPage() {
               <div className="mt-2 space-y-2">
                 <Link
                   to="/knowledge"
-                  className="inline-flex items-center gap-1 px-3 py-1 bg-purple-50 text-purple-700 rounded-lg text-xs font-medium hover:bg-purple-100"
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all hover:opacity-80"
+                  style={{ borderColor: "var(--color-status-answered)", color: "var(--color-status-answered)", backgroundColor: "rgba(167,139,250,0.1)" }}
                 >
                   📚 View generated knowledge
                 </Link>
@@ -376,15 +383,16 @@ export default function CapsuleDetailPage() {
                           alert(e?.message || "Failed to update visibility");
                         }
                       }}
-                      className={`px-3 py-1 rounded-lg text-xs font-medium transition ${
-                        knowledgeItem.visibility === "PUBLIC"
-                          ? "bg-green-100 text-green-700 hover:bg-green-200"
-                          : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                      }`}
+                      className="px-3 py-1.5 rounded-lg text-xs font-medium border transition-all hover:opacity-80"
+                      style={{
+                        borderColor: knowledgeItem.visibility === "PUBLIC" ? "var(--color-status-resolved)" : "var(--color-border)",
+                        color: knowledgeItem.visibility === "PUBLIC" ? "var(--color-status-resolved)" : "var(--color-text-muted)",
+                        backgroundColor: knowledgeItem.visibility === "PUBLIC" ? "rgba(34,197,94,0.1)" : "var(--color-bg-input)",
+                      }}
                     >
                       {knowledgeItem.visibility === "PUBLIC" ? "🌍 Published" : "🔒 Private"}
                     </button>
-                    <span className="text-xs text-gray-400">
+                    <span className="text-[10px]" style={{ color: "var(--color-text-muted)" }}>
                       {knowledgeItem.visibility === "PUBLIC"
                         ? "Visible in global search"
                         : "Only visible to workspace members"}
@@ -393,7 +401,7 @@ export default function CapsuleDetailPage() {
                 )}
               </div>
             ) : knowledgeLoading ? (
-              <p className="text-xs text-gray-400 mt-2">
+              <p className="text-[10px] mt-2" style={{ color: "var(--color-text-muted)" }}>
                 ⏳ Generating knowledge item...
               </p>
             ) : null}
@@ -402,31 +410,32 @@ export default function CapsuleDetailPage() {
       </div>
 
       {/* Comments */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4">
-        <h2 className="text-sm font-semibold text-gray-700 mb-3">
+      <div className="rounded-xl p-4 border transition-theme" style={{ backgroundColor: "var(--color-bg-card)", borderColor: "var(--color-border)" }}>
+        <h2 className="text-sm font-semibold mb-3" style={{ color: "var(--color-text-primary)" }}>
           💬 Comments ({comments.length})
         </h2>
 
         {comments.length === 0 ? (
-          <p className="text-sm text-gray-400 py-4 text-center">
+          <p className="text-xs text-center py-4" style={{ color: "var(--color-text-muted)" }}>
             No comments yet. Start a discussion.
           </p>
         ) : (
-          <div className="space-y-3 mb-4">
+          <div className="space-y-2 mb-4">
             {comments.map((c) => (
               <div
                 key={c.id}
-                className="bg-gray-50 rounded-lg p-3 border border-gray-100"
+                className="rounded-lg p-3 border transition-theme"
+                style={{ backgroundColor: "var(--color-bg-input)", borderColor: "var(--color-border)" }}
               >
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="text-sm font-medium text-gray-700">
+                  <span className="text-xs font-medium" style={{ color: "var(--color-text-primary)" }}>
                     {c.author?.name || c.author?.email}
                   </span>
-                  <span className="text-xs text-gray-400">
+                  <span className="text-[10px]" style={{ color: "var(--color-text-muted)" }}>
                     {new Date(c.createdAt).toLocaleString()}
                   </span>
                 </div>
-                <p className="text-sm text-gray-600">{c.body}</p>
+                <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>{c.body}</p>
               </div>
             ))}
           </div>
@@ -438,8 +447,9 @@ export default function CapsuleDetailPage() {
             placeholder="Write a comment..."
             value={newComment}
             onChange={(e) => setNewComment(e.target.value)}
-            className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none resize-none"
+            className="flex-1 rounded-lg px-3 py-2 text-sm border outline-none focus:ring-1 transition-theme resize-none"
             rows={2}
+            style={{ backgroundColor: "var(--color-bg-input)", borderColor: "var(--color-border)", color: "var(--color-text-primary)" }}
             onKeyDown={(e) => {
               if (e.key === "Enter" && (e.metaKey || e.ctrlKey))
                 handlePostComment();
@@ -448,7 +458,8 @@ export default function CapsuleDetailPage() {
           <button
             onClick={handlePostComment}
             disabled={!newComment.trim() || posting}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 self-end"
+            className="px-4 py-2 rounded-lg text-xs font-medium border transition-all hover:opacity-90 disabled:opacity-50 self-end"
+            style={{ backgroundColor: "var(--color-accent)", borderColor: "var(--color-accent)", color: "#000" }}
           >
             {posting ? "Posting..." : "Post"}
           </button>

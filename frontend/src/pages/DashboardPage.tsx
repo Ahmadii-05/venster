@@ -11,6 +11,9 @@ export default function DashboardPage() {
   const [allCapsules, setAllCapsules] = useState<Capsule[]>([]);
   const [knowledgeCount, setKnowledgeCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [showCreateWorkspace, setShowCreateWorkspace] = useState(false);
+  const [newWorkspaceName, setNewWorkspaceName] = useState("");
+  const [creatingWs, setCreatingWs] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -18,7 +21,6 @@ export default function DashboardPage() {
         const ws = await workspaceApi.list();
         setWorkspaces(ws || []);
 
-        // Load capsules from all workspaces
         const allCaps: Capsule[] = [];
         for (const w of ws || []) {
           try {
@@ -31,11 +33,9 @@ export default function DashboardPage() {
         }
         setAllCapsules(allCaps);
 
-        // Filter capsules where current user is assignee
         const myCaps = allCaps.filter((c) => c.reviewer?.email === email);
         setCapsules(myCaps.slice(0, 4));
 
-        // Count knowledge items
         try {
           const ki = await knowledgeApi.search({ q: "a", workspaceId: ws?.[0]?.id });
           setKnowledgeCount((ki || []).length);
@@ -47,10 +47,24 @@ export default function DashboardPage() {
     load();
   }, [email]);
 
+  const handleCreateWorkspace = async () => {
+    if (newWorkspaceName.length < 3) return;
+    setCreatingWs(true);
+    try {
+      const ws = await workspaceApi.create(newWorkspaceName.trim());
+      setWorkspaces((prev) => [...prev, ws]);
+      setNewWorkspaceName("");
+      setShowCreateWorkspace(false);
+    } catch (err: any) {
+      alert(err.message || "Failed to create workspace");
+    } finally {
+      setCreatingWs(false);
+    }
+  };
+
   const name = email?.split("@")[0] || "there";
   const greeting = new Date().getHours() < 12 ? "Good morning" : new Date().getHours() < 18 ? "Good afternoon" : "Good evening";
 
-  // Stats
   const openCount = allCapsules.filter((c) => c.status === "OPEN").length;
   const inReviewCount = allCapsules.filter((c) => c.status === "IN_REVIEW").length;
   const answeredCount = allCapsules.filter((c) => c.status === "ANSWERED").length;
@@ -83,7 +97,7 @@ export default function DashboardPage() {
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
-      {/* Header */}
+      {/* Header + Actions */}
       <div className="flex items-start justify-between">
         <div>
           <div className="text-xs uppercase tracking-widest font-mono mb-1" style={{ color: "var(--color-accent)" }}>
@@ -96,13 +110,104 @@ export default function DashboardPage() {
             Capsules attached to your Artifacts, reviews waiting on you, and what your team resolved.
           </p>
         </div>
-        <Link
-          to="/"
-          className="px-4 py-2 rounded-lg text-sm font-medium border transition-all hover:opacity-80"
-          style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowCreateWorkspace(!showCreateWorkspace)}
+            className="px-4 py-2 rounded-lg text-sm font-medium transition-all hover:opacity-90"
+            style={{ backgroundColor: "var(--color-accent)", color: "#000" }}
+          >
+            + New Workspace
+          </button>
+          <Link
+            to="/"
+            className="px-4 py-2 rounded-lg text-sm font-medium border transition-all hover:opacity-80"
+            style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}
+          >
+            Open Capsule board ↗
+          </Link>
+        </div>
+      </div>
+
+      {/* Create Workspace Form */}
+      {showCreateWorkspace && (
+        <div
+          className="rounded-xl p-4 border transition-theme"
+          style={{ backgroundColor: "var(--color-bg-card)", borderColor: "var(--color-border)" }}
         >
-          Open Capsule board ↗
-        </Link>
+          <div className="text-xs uppercase tracking-widest font-mono mb-3" style={{ color: "var(--color-accent)" }}>
+            NEW WORKSPACE
+          </div>
+          <div className="flex gap-3">
+            <input
+              type="text"
+              placeholder="Workspace name (min 3 chars)"
+              value={newWorkspaceName}
+              onChange={(e) => setNewWorkspaceName(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleCreateWorkspace()}
+              className="flex-1 px-3 py-2 rounded-lg text-sm border outline-none focus:ring-1 transition-theme"
+              style={{
+                backgroundColor: "var(--color-bg-input)",
+                borderColor: "var(--color-border)",
+                color: "var(--color-text-primary)",
+              }}
+            />
+            <button
+              onClick={handleCreateWorkspace}
+              disabled={newWorkspaceName.length < 3 || creatingWs}
+              className="px-4 py-2 rounded-lg text-sm font-medium transition-all hover:opacity-90 disabled:opacity-50"
+              style={{ backgroundColor: "var(--color-accent)", color: "#000" }}
+            >
+              {creatingWs ? "Creating..." : "Create"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Workspaces — at the top */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>
+            Workspaces
+          </h2>
+        </div>
+        {workspaces.length === 0 ? (
+          <div
+            className="rounded-xl p-8 border text-center transition-theme"
+            style={{ backgroundColor: "var(--color-bg-card)", borderColor: "var(--color-border)" }}
+          >
+            <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
+              No workspaces yet. Click "+ New Workspace" above to create one.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {workspaces.map((ws) => (
+              <Link
+                key={ws.id}
+                to={`/workspaces/${ws.id}`}
+                className="rounded-xl p-4 border transition-all hover:opacity-90"
+                style={{ backgroundColor: "var(--color-bg-card)", borderColor: "var(--color-border)" }}
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <div
+                    className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold"
+                    style={{ backgroundColor: "var(--color-accent-dim)", color: "var(--color-accent)" }}
+                  >
+                    {ws.name.substring(0, 2).toUpperCase()}
+                  </div>
+                  <div>
+                    <div className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>
+                      {ws.name}
+                    </div>
+                    <div className="text-[10px] font-mono" style={{ color: "var(--color-text-muted)" }}>
+                      {ws.id.substring(0, 8)}
+                    </div>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Stat Cards */}
@@ -128,7 +233,6 @@ export default function DashboardPage() {
 
       {/* Lifecycle + Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Lifecycle Distribution */}
         <div
           className="rounded-xl p-5 border transition-theme"
           style={{ backgroundColor: "var(--color-bg-card)", borderColor: "var(--color-border)" }}
@@ -157,7 +261,6 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Activity (simplified) */}
         <div
           className="rounded-xl p-5 border transition-theme"
           style={{ backgroundColor: "var(--color-bg-card)", borderColor: "var(--color-border)" }}
@@ -166,27 +269,51 @@ export default function DashboardPage() {
             Capsule activity — last 7 days
           </h2>
           <div className="flex items-end justify-between h-40 gap-2">
-            {["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"].map((day) => {
-              const created = Math.floor(Math.random() * 5) + 1;
-              const resolved = Math.floor(Math.random() * 4) + 1;
-              return (
-                <div key={day} className="flex flex-col items-center gap-1 flex-1">
-                  <div className="flex gap-0.5 items-end" style={{ height: "120px" }}>
-                    <div
-                      className="w-3 rounded-t"
-                      style={{ height: `${created * 20}px`, backgroundColor: "var(--color-accent)" }}
-                    />
-                    <div
-                      className="w-3 rounded-t"
-                      style={{ height: `${resolved * 20}px`, backgroundColor: "var(--color-status-resolved)" }}
-                    />
+            {(() => {
+              const days = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
+              const now = new Date();
+              const weekAgo = new Date(now);
+              weekAgo.setDate(weekAgo.getDate() - 7);
+
+              const counts = days.map((_, i) => {
+                const dayStart = new Date(weekAgo);
+                dayStart.setDate(dayStart.getDate() + i);
+                const dayEnd = new Date(dayStart);
+                dayEnd.setDate(dayEnd.getDate() + 1);
+                const created = allCapsules.filter((c) => {
+                  const d = new Date(c.createdAt);
+                  return d >= dayStart && d < dayEnd;
+                }).length;
+                const resolved = allCapsules.filter((c) => {
+                  if (c.status !== "RESOLVED") return false;
+                  const d = new Date(c.updatedAt);
+                  return d >= dayStart && d < dayEnd;
+                }).length;
+                return { created, resolved };
+              });
+              const maxCount = Math.max(...counts.flatMap((c) => [c.created, c.resolved]), 1);
+
+              return days.map((day, i) => {
+                const { created, resolved } = counts[i];
+                return (
+                  <div key={day} className="flex flex-col items-center gap-1 flex-1">
+                    <div className="flex gap-0.5 items-end" style={{ height: "120px" }}>
+                      <div
+                        className="w-3 rounded-t"
+                        style={{ height: `${Math.max((created / maxCount) * 100, 8)}%`, backgroundColor: "var(--color-accent)" }}
+                      />
+                      <div
+                        className="w-3 rounded-t"
+                        style={{ height: `${Math.max((resolved / maxCount) * 100, 8)}%`, backgroundColor: "var(--color-status-resolved)" }}
+                      />
+                    </div>
+                    <span className="text-[10px] font-mono" style={{ color: "var(--color-text-muted)" }}>
+                      {day}
+                    </span>
                   </div>
-                  <span className="text-[10px] font-mono" style={{ color: "var(--color-text-muted)" }}>
-                    {day}
-                  </span>
-                </div>
-              );
-            })}
+                );
+              });
+            })()}
           </div>
           <div className="flex items-center gap-4 mt-3 text-xs" style={{ color: "var(--color-text-muted)" }}>
             <span className="flex items-center gap-1">
@@ -251,42 +378,6 @@ export default function DashboardPage() {
           </div>
         )}
       </div>
-
-      {/* Workspaces quick access */}
-      {workspaces.length > 0 && (
-        <div>
-          <h2 className="text-sm font-semibold mb-3" style={{ color: "var(--color-text-primary)" }}>
-            Workspaces
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {workspaces.map((ws) => (
-              <Link
-                key={ws.id}
-                to={`/workspaces/${ws.id}`}
-                className="rounded-xl p-4 border transition-all hover:opacity-90"
-                style={{ backgroundColor: "var(--color-bg-card)", borderColor: "var(--color-border)" }}
-              >
-                <div className="flex items-center gap-2 mb-2">
-                  <div
-                    className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold"
-                    style={{ backgroundColor: "var(--color-accent-dim)", color: "var(--color-accent)" }}
-                  >
-                    {ws.name.substring(0, 2).toUpperCase()}
-                  </div>
-                  <div>
-                    <div className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>
-                      {ws.name}
-                    </div>
-                    <div className="text-[10px] font-mono" style={{ color: "var(--color-text-muted)" }}>
-                      {ws.id.substring(0, 8)}
-                    </div>
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

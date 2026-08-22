@@ -152,12 +152,12 @@ export const ALLOWED_TRANSITIONS: Record<CapsuleStatus, CapsuleStatus[]> = {
 };
 
 // ── Status Colors ─────────────────────────────────────────────
-export const STATUS_COLORS: Record<CapsuleStatus, string> = {
-  OPEN: "bg-blue-100 text-blue-800",
-  IN_REVIEW: "bg-yellow-100 text-yellow-800",
-  ANSWERED: "bg-purple-100 text-purple-800",
-  RESOLVED: "bg-green-100 text-green-800",
-  ARCHIVED: "bg-gray-100 text-gray-800",
+export const STATUS_COLORS: Record<CapsuleStatus, { bg: string; text: string }> = {
+  OPEN: { bg: "rgba(56, 189, 248, 0.15)", text: "var(--color-status-open)" },
+  IN_REVIEW: { bg: "rgba(251, 191, 36, 0.15)", text: "var(--color-status-review)" },
+  ANSWERED: { bg: "rgba(167, 139, 250, 0.15)", text: "var(--color-status-answered)" },
+  RESOLVED: { bg: "rgba(34, 197, 94, 0.15)", text: "var(--color-status-resolved)" },
+  ARCHIVED: { bg: "rgba(107, 114, 128, 0.15)", text: "var(--color-status-archived)" },
 };
 
 // ── Knowledge Visibility ─────────────────────────────────────

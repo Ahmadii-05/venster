@@ -20,9 +20,12 @@ import type {
 // ── Base URL from env ─────────────────────────────────────────
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8082";
 
-// ── In-memory auth state (no localStorage) ────────────────────
-let _token: string | null = null;
-let _user: { email: string } | null = null;
+// ── Auth state persisted in localStorage ──────────────────────
+let _token: string | null = localStorage.getItem("token");
+let _user: { email: string } | null = (() => {
+  const raw = localStorage.getItem("user");
+  return raw ? JSON.parse(raw) : null;
+})();
 
 export function getStoredToken(): string | null {
   return _token;
@@ -31,11 +34,15 @@ export function getStoredToken(): string | null {
 export function setAuthToken(token: string, email: string) {
   _token = token;
   _user = { email };
+  localStorage.setItem("token", token);
+  localStorage.setItem("user", JSON.stringify({ email }));
 }
 
 export function clearAuthToken() {
   _token = null;
   _user = null;
+  localStorage.removeItem("token");
+  localStorage.removeItem("user");
 }
 
 export function getStoredUser(): { email: string } | null {

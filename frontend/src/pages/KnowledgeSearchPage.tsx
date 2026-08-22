@@ -37,21 +37,28 @@ export default function KnowledgeSearchPage() {
 
   if (selected) {
     return (
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-4xl mx-auto p-6">
         <button
           onClick={() => setSelected(null)}
-          className="text-sm text-blue-600 hover:underline mb-4"
+          className="text-xs font-medium mb-4 transition-all hover:opacity-80"
+          style={{ color: "var(--color-accent)" }}
         >
           ← Back to search results
         </button>
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <div className="rounded-xl p-6 border transition-theme" style={{ backgroundColor: "var(--color-bg-card)", borderColor: "var(--color-border)" }}>
           <div className="flex items-start justify-between mb-4">
-            <h1 className="text-xl font-bold text-gray-800">{selected.title}</h1>
+            <h1 className="text-xl font-bold" style={{ color: "var(--color-text-primary)" }}>{selected.title}</h1>
             <div className="flex gap-2 shrink-0">
-              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+              <span
+                className="px-2 py-0.5 rounded-full text-xs font-medium"
+                style={{ backgroundColor: "rgba(167,139,250,0.15)", color: "var(--color-status-answered)" }}
+              >
                 {selected.category}
               </span>
-              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+              <span
+                className="px-2 py-0.5 rounded-full text-xs font-medium"
+                style={{ backgroundColor: "rgba(34,197,94,0.15)", color: "var(--color-status-resolved)" }}
+              >
                 {Math.round(selected.confidence * 100)}% confidence
               </span>
             </div>
@@ -59,23 +66,23 @@ export default function KnowledgeSearchPage() {
 
           <div className="space-y-4">
             <div>
-              <h3 className="text-sm font-semibold text-gray-500 mb-1">Summary</h3>
-              <p className="text-sm text-gray-700">{selected.summary}</p>
+              <h3 className="text-xs uppercase tracking-widest font-mono mb-1" style={{ color: "var(--color-kicker)" }}>Summary</h3>
+              <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>{selected.summary}</p>
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-gray-500 mb-1">Root Cause</h3>
-              <p className="text-sm text-gray-700">{selected.rootCause}</p>
+              <h3 className="text-xs uppercase tracking-widest font-mono mb-1" style={{ color: "var(--color-kicker)" }}>Root Cause</h3>
+              <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>{selected.rootCause}</p>
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-gray-500 mb-1">Solution</h3>
-              <p className="text-sm text-gray-700">{selected.solution}</p>
+              <h3 className="text-xs uppercase tracking-widest font-mono mb-1" style={{ color: "var(--color-kicker)" }}>Solution</h3>
+              <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>{selected.solution}</p>
             </div>
             {selected.tags && selected.tags.length > 0 && (
               <div>
-                <h3 className="text-sm font-semibold text-gray-500 mb-1">Tags</h3>
+                <h3 className="text-xs uppercase tracking-widest font-mono mb-1" style={{ color: "var(--color-kicker)" }}>Tags</h3>
                 <div className="flex gap-1 flex-wrap">
                   {selected.tags.map((tag) => (
-                    <span key={tag} className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-xs">
+                    <span key={tag} className="px-2 py-0.5 rounded text-xs" style={{ backgroundColor: "var(--color-bg-input)", color: "var(--color-text-muted)" }}>
                       {tag}
                     </span>
                   ))}
@@ -83,9 +90,9 @@ export default function KnowledgeSearchPage() {
               </div>
             )}
             {selected.resolution && (
-              <div className="border-t border-gray-100 pt-3">
-                <h3 className="text-sm font-semibold text-gray-500 mb-1">Source</h3>
-                <p className="text-xs text-gray-400">
+              <div className="border-t pt-3" style={{ borderColor: "var(--color-border)" }}>
+                <h3 className="text-xs uppercase tracking-widest font-mono mb-1" style={{ color: "var(--color-kicker)" }}>Source</h3>
+                <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
                   Resolved by {selected.resolution.resolver?.name || selected.resolution.resolver?.email}
                   {" • "}
                   {new Date(selected.resolution.resolvedAt).toLocaleDateString()}
@@ -99,39 +106,59 @@ export default function KnowledgeSearchPage() {
   }
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">🔍 Knowledge Search</h1>
+    <div className="p-6 max-w-5xl mx-auto space-y-6">
+      {/* Header */}
+      <div>
+        <div className="text-[10px] uppercase tracking-widest font-mono mb-1" style={{ color: "var(--color-accent)" }}>
+          LIBRARY
+        </div>
+        <h1 className="text-2xl font-bold" style={{ color: "var(--color-text-primary)" }}>
+          Knowledge Search
+        </h1>
+        <p className="text-sm mt-1" style={{ color: "var(--color-text-secondary)" }}>
+          Search your resolved issues using semantic similarity.
+        </p>
+      </div>
 
       {/* Search bar */}
-      <div className="flex gap-2 mb-4">
+      <div className="flex gap-2">
         <input
           type="text"
           placeholder="Search your resolved issues (semantic search)..."
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-          className="flex-1 border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+          className="flex-1 rounded-lg px-4 py-2.5 text-sm border outline-none focus:ring-1 transition-theme"
+          style={{
+            backgroundColor: "var(--color-bg-input)",
+            borderColor: "var(--color-border)",
+            color: "var(--color-text-primary)",
+          }}
         />
         <button
           onClick={handleSearch}
           disabled={!query.trim() || loading}
-          className="bg-blue-600 text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+          className="px-5 py-2.5 rounded-lg text-sm font-medium border transition-all hover:opacity-90 disabled:opacity-50"
+          style={{ backgroundColor: "var(--color-accent)", borderColor: "var(--color-accent)", color: "#000" }}
         >
           {loading ? "Searching..." : "Search"}
         </button>
       </div>
 
       {/* Category filter */}
-      <div className="flex gap-1 mb-4 flex-wrap">
+      <div className="flex gap-1 flex-wrap">
         {CATEGORIES.map((c) => (
           <button
             key={c}
             onClick={() => setCategory(c)}
-            className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
-              category === c
-                ? "bg-blue-600 text-white"
-                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+              category === c ? "border" : "border opacity-70 hover:opacity-100"
             }`}
+            style={{
+              backgroundColor: category === c ? "var(--color-accent-dim)" : "var(--color-bg-card)",
+              borderColor: category === c ? "var(--color-accent)" : "var(--color-border)",
+              color: category === c ? "var(--color-accent)" : "var(--color-text-secondary)",
+            }}
           >
             {c}
           </button>
@@ -139,37 +166,47 @@ export default function KnowledgeSearchPage() {
       </div>
 
       {error && (
-        <div className="bg-red-50 text-red-700 p-3 rounded-lg mb-4 text-sm">{error}</div>
+        <div className="rounded-lg p-3 border text-sm" style={{ backgroundColor: "rgba(239,68,68,0.1)", borderColor: "var(--color-danger)", color: "var(--color-danger)" }}>
+          {error}
+        </div>
       )}
 
       {loading ? (
-        <div className="text-gray-500 text-sm py-8 text-center">Searching knowledge base...</div>
+        <div className="text-sm text-center py-12" style={{ color: "var(--color-text-muted)" }}>
+          Searching knowledge base...
+        </div>
       ) : !searched ? (
-        <div className="text-center py-12 text-gray-400">
-          <p className="text-lg mb-2">Enter a query to search resolved issues</p>
-          <p className="text-sm">Uses semantic similarity, not just keyword matching</p>
+        <div className="text-center py-12" style={{ color: "var(--color-text-muted)" }}>
+          <p className="text-sm mb-1" style={{ color: "var(--color-text-secondary)" }}>Enter a query to search resolved issues</p>
+          <p className="text-xs">Uses semantic similarity, not just keyword matching</p>
         </div>
       ) : results.length === 0 ? (
-        <div className="text-center py-12 text-gray-400">
-          <p className="text-lg mb-2">No results found</p>
-          <p className="text-sm">Try different keywords or a broader query</p>
+        <div className="text-center py-12" style={{ color: "var(--color-text-muted)" }}>
+          <p className="text-sm mb-1" style={{ color: "var(--color-text-secondary)" }}>No results found</p>
+          <p className="text-xs">Try different keywords or a broader query</p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-2">
           {results.map((item) => (
             <button
               key={item.id}
               onClick={() => setSelected(item)}
-              className="w-full text-left bg-white rounded-xl border border-gray-200 p-4 hover:shadow-md transition-shadow"
+              className="w-full text-left rounded-xl p-4 border transition-all hover:opacity-90"
+              style={{ backgroundColor: "var(--color-bg-card)", borderColor: "var(--color-border)" }}
             >
               <div className="flex items-start justify-between">
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-gray-800">{item.title}</h3>
-                  <p className="text-sm text-gray-500 mt-1 line-clamp-2">{item.summary}</p>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>📖</span>
+                    <h3 className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>{item.title}</h3>
+                  </div>
+                  <p className="text-xs line-clamp-2 mt-0.5" style={{ color: "var(--color-text-secondary)" }}>
+                    {item.summary}
+                  </p>
                   {item.tags && item.tags.length > 0 && (
                     <div className="flex gap-1 mt-2 flex-wrap">
                       {item.tags.slice(0, 5).map((tag) => (
-                        <span key={tag} className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-xs">
+                        <span key={tag} className="px-2 py-0.5 rounded text-[10px]" style={{ backgroundColor: "var(--color-bg-input)", color: "var(--color-text-muted)" }}>
                           {tag}
                         </span>
                       ))}
@@ -177,10 +214,13 @@ export default function KnowledgeSearchPage() {
                   )}
                 </div>
                 <div className="flex flex-col items-end gap-1 shrink-0 ml-3">
-                  <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                  <span
+                    className="px-2 py-0.5 rounded-full text-xs font-medium"
+                    style={{ backgroundColor: "rgba(167,139,250,0.15)", color: "var(--color-status-answered)" }}
+                  >
                     {item.category}
                   </span>
-                  <span className="text-xs text-gray-400">
+                  <span className="text-[10px]" style={{ color: "var(--color-text-muted)" }}>
                     {Math.round(item.confidence * 100)}%
                   </span>
                 </div>

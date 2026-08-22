@@ -7,12 +7,12 @@ import { useEffect } from "react";
 import type { Notification } from "../types";
 
 const NAV_ITEMS = [
-  { path: "/", label: "Dashboard", icon: "⊞" },
-  { path: "/knowledge", label: "Knowledge", icon: "◎" },
-  { path: "/knowledge/global", label: "Global Knowledge", icon: "⊕" },
-  { path: "/community", label: "Community Q&A", icon: "⊟" },
-  { path: "/notifications", label: "Notifications", icon: "🔔" },
-  { path: "/profile", label: "Profile", icon: "👤" },
+  { path: "/", label: "Workspaces" },
+  { path: "/knowledge", label: "Knowledge" },
+  { path: "/knowledge/global", label: "Global Knowledge" },
+  { path: "/community", label: "Community Q&A" },
+  { path: "/notifications", label: "Notifications" },
+  { path: "/profile", label: "Profile" },
 ];
 
 export default function Layout({ children }: { children: ReactNode }) {
@@ -75,9 +75,12 @@ export default function Layout({ children }: { children: ReactNode }) {
         {/* Nav */}
         <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
           {NAV_ITEMS.map((item) => {
-            const active = location.pathname === item.path;
-            return (
-              <Link
+            const active = item.path === "/"
+              ? location.pathname === "/" || location.pathname.startsWith("/workspaces")
+              : item.path === "/knowledge/global"
+              ? location.pathname.startsWith("/knowledge/global")
+              : location.pathname === item.path;
+            return (                <Link
                 key={item.path}
                 to={item.path}
                 className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all"
@@ -86,8 +89,15 @@ export default function Layout({ children }: { children: ReactNode }) {
                   color: active ? "var(--color-accent)" : "var(--color-text-secondary)",
                 }}
               >
-                <span className="text-base w-5 text-center">{item.icon}</span>
                 {!collapsed && <span>{item.label}</span>}
+                {!collapsed && item.path === "/notifications" && unreadCount > 0 && (
+                  <span
+                    className="ml-auto px-1.5 py-0.5 rounded-full text-[10px] font-bold"
+                    style={{ backgroundColor: "var(--color-danger)", color: "#fff" }}
+                  >
+                    {unreadCount}
+                  </span>
+                )}
               </Link>
             );
           })}
@@ -163,19 +173,6 @@ export default function Layout({ children }: { children: ReactNode }) {
           >
             {theme === "dark" ? "☀" : "☾"}
           </button>
-
-          {/* Notifications */}
-          <Link to="/" className="relative p-2 rounded-lg transition-all hover:opacity-80" style={{ color: "var(--color-text-secondary)" }}>
-            🔔
-            {unreadCount > 0 && (
-              <span
-                className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full text-[10px] font-bold flex items-center justify-center"
-                style={{ backgroundColor: "var(--color-accent)", color: "#000" }}
-              >
-                {unreadCount > 9 ? "9+" : unreadCount}
-              </span>
-            )}
-          </Link>
 
           {/* Avatar */}
           <div
