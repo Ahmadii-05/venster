@@ -1,0 +1,94 @@
+@import "tailwindcss";
+
+/* ── Theme Custom Properties ─────────────────────────────────── */
+@theme {
+  --color-bg-primary: #0B0D12;
+  --color-bg-card: #12151C;
+  --color-bg-elevated: #151922;
+  --color-bg-input: #1A1F2B;
+  --color-border: #1F2430;
+  --color-border-hover: #2A3040;
+
+  --color-text-primary: #E6EDF3;
+  --color-text-secondary: #8B949E;
+  --color-text-muted: #484F58;
+
+  --color-accent: #14B8A6;
+  --color-accent-hover: #2DD4BF;
+  --color-accent-dim: rgba(20, 184, 166, 0.15);
+
+  --color-status-open: #38BDF8;
+  --color-status-review: #FBBF24;
+  --color-status-answered: #A78BFA;
+  --color-status-resolved: #22C55E;
+  --color-status-archived: #6B7280;
+
+  --color-priority-high: #F97316;
+  --color-priority-medium: #3B82F6;
+  --color-priority-low: #6B7280;
+
+  --color-danger: #EF4444;
+  --color-success: #22C55E;
+  --color-warning: #F59E0B;
+}
+
+/* ── Light theme overrides ──────────────────────────────────── */
+.light {
+  --color-bg-primary: #F8FAFC;
+  --color-bg-card: #FFFFFF;
+  --color-bg-elevated: #F1F5F9;
+  --color-bg-input: #F1F5F9;
+  --color-border: #E2E8F0;
+  --color-border-hover: #CBD5E1;
+
+  --color-text-primary: #0F172A;
+  --color-text-secondary: #475569;
+  --color-text-muted: #94A3B8;
+
+  --color-accent: #0D9488;
+  --color-accent-hover: #14B8A6;
+  --color-accent-dim: rgba(13, 148, 136, 0.1);
+
+  --color-status-open: #0284C7;
+  --color-status-review: #D97706;
+  --color-status-answered: #7C3AED;
+  --color-status-resolved: #16A34A;
+  --color-status-archived: #9CA3AF;
+
+  --color-priority-high: #EA580C;
+  --color-priority-medium: #2563EB;
+  --color-priority-low: #9CA3AF;
+}
+
+/* ── Base styles ────────────────────────────────────────────── */
+body {
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+/* ── Scrollbar styling ──────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-border-hover);
+}
+
+/* ── Transition utilities ───────────────────────────────────── */
+.transition-theme {
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+/* ── Monospace utility ──────────────────────────────────────── */
+.font-mono {
+  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', ui-monospace, monospace;
+}

@@ -44,8 +44,8 @@ CREATE TABLE artifacts (
     project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
     file_path TEXT NOT NULL,
     repository VARCHAR(500),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    created_at TIMESTAMP NOT NULL DEFAULT now(),
+    updated_at TIMESTAMP NOT NULL DEFAULT now()
 );
 
 CREATE TABLE artifact_versions (
@@ -53,7 +53,7 @@ CREATE TABLE artifact_versions (
     artifact_id UUID NOT NULL REFERENCES artifacts(id) ON DELETE CASCADE,
     commit_hash VARCHAR(100),
     version_label VARCHAR(100),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    created_at TIMESTAMP NOT NULL DEFAULT now()
 );
 
 CREATE TABLE artifact_anchors (
@@ -64,7 +64,7 @@ CREATE TABLE artifact_anchors (
     selected_text TEXT,
     content_hash VARCHAR(128),
     symbol_name VARCHAR(255),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    created_at TIMESTAMP NOT NULL DEFAULT now()
 );
 
 CREATE TABLE capsules (
@@ -76,8 +76,8 @@ CREATE TABLE capsules (
     status VARCHAR(20) NOT NULL DEFAULT 'OPEN'
         CHECK (status IN ('OPEN','IN_REVIEW','ANSWERED','RESOLVED','ARCHIVED')),
     title TEXT NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    created_at TIMESTAMP NOT NULL DEFAULT now(),
+    updated_at TIMESTAMP NOT NULL DEFAULT now()
 );
 
 CREATE TABLE comments (
@@ -85,7 +85,7 @@ CREATE TABLE comments (
     capsule_id UUID NOT NULL REFERENCES capsules(id) ON DELETE CASCADE,
     author_id UUID NOT NULL REFERENCES users(id),
     body TEXT NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    created_at TIMESTAMP NOT NULL DEFAULT now()
 );
 
 CREATE TABLE resolutions (
@@ -93,7 +93,7 @@ CREATE TABLE resolutions (
     capsule_id UUID NOT NULL UNIQUE REFERENCES capsules(id) ON DELETE CASCADE,
     resolver_id UUID NOT NULL REFERENCES users(id),
     final_solution TEXT NOT NULL,
-    resolved_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    resolved_at TIMESTAMP NOT NULL DEFAULT now()
 );
 
 CREATE TABLE knowledge_items (
@@ -117,7 +117,7 @@ CREATE TABLE notifications (
     type VARCHAR(50) NOT NULL,
     context JSONB,
     read BOOLEAN NOT NULL DEFAULT false,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    created_at TIMESTAMP NOT NULL DEFAULT now()
 );
 
 CREATE TABLE audit_log (

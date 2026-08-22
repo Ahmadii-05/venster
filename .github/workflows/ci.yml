@@ -1,0 +1,130 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  # ── Backend: build + test ──────────────────────────────────
+  backend:
+    name: Backend (Java 17 + Testcontainers)
+    runs-on: ubuntu-latest
+
+    services:
+      # Docker-in-Docker for Testcontainers
+      docker:
+        image: docker:24-dind
+        options: --privileged
+        env:
+          DOCKER_TLS_CERTDIR: ""
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: "17"
+          distribution: "temurin"
+          cache: maven
+
+      - name: Build backend (skip tests)
+        working-directory: microhubs-backend
+        run: mvn clean package -Dmaven.test.skip=true -q
+
+      - name: Run integration tests
+        working-directory: microhubs-backend
+        run: mvn test
+        env:
+          # Testcontainers will use the Docker-in-Docker service
+          DOCKER_HOST: tcp://localhost:2375
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-reports
+          path: microhubs-backend/target/surefire-reports/
+          retention-days: 7
+
+  # ── Frontend: typecheck + build ────────────────────────────
+  frontend:
+    name: Frontend (TypeScript + Vite)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Type check
+        working-directory: frontend
+        run: npx tsc --noEmit
+
+      - name: Production build
+        working-directory: frontend
+        run: npm run build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: frontend/dist/
+          retention-days: 7
+
+  # ── VS Code Extension: typecheck ──────────────────────────
+  vscode-extension:
+    name: VS Code Extension (TypeScript)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: vscode-extension/package-lock.json
+
+      - name: Install dependencies
+        working-directory: vscode-extension
+        run: npm ci
+
+      - name: Type check
+        working-directory: vscode-extension
+        run: npx tsc --noEmit
+
+  # ── Summary gate ──────────────────────────────────────────
+  ci-passed:
+    name: CI Passed
+    runs-on: ubuntu-latest
+    needs: [backend, frontend, vscode-extension]
+    if: always()
+    steps:
+      - name: Check all jobs
+        run: |
+          if [ "${{ needs.backend.result }}" != "success" ]; then
+            echo "❌ Backend failed"
+            exit 1
+          fi
+          if [ "${{ needs.frontend.result }}" != "success" ]; then
+            echo "❌ Frontend failed"
+            exit 1
+          fi
+          if [ "${{ needs.vscode-extension.result }}" != "success" ]; then
+            echo "❌ VS Code extension failed"
+            exit 1
+          fi
+          echo "✅ All checks passed"

@@ -1,0 +1,91 @@
+{
+  "name": "microhubs-extension",
+  "displayName": "Micro-Hubs",
+  "description": "Workflow-Embedded Micro-Hubs — Create capsules from code selections",
+  "version": "0.0.1",
+  "publisher": "microhubs",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Other"],
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "microhubs.login",
+        "title": "Micro-Hubs: Login"
+      },
+      {
+        "command": "microhubs.logout",
+        "title": "Micro-Hubs: Logout"
+      },
+      {
+        "command": "microhubs.createCapsule",
+        "title": "Micro-Hubs: Create Capsule from Selection"
+      },
+      {
+        "command": "microhubs.viewCapsules",
+        "title": "Micro-Hubs: View Capsules for Current File"
+      },
+      {
+        "command": "microhubs.replyToCapsule",
+        "title": "Micro-Hubs: Reply to Capsule"
+      },
+      {
+        "command": "microhubs.refreshCapsules",
+        "title": "Micro-Hubs: Refresh Capsule List"
+      },
+      {
+        "command": "microhubs.searchKnowledge",
+        "title": "Micro-Hubs: Search Knowledge"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "microhubs",
+          "title": "Micro-Hubs",
+          "icon": "$(comment-discussion)"
+        }
+      ]
+    },
+    "views": {
+      "microhubs": [
+        {
+          "id": "microhubs.capsules",
+          "name": "Capsules"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Micro-Hubs",
+      "properties": {
+        "microhubs.baseUrl": {
+          "type": "string",
+          "default": "http://localhost:8082",
+          "description": "Backend API base URL"
+        }
+      }
+    },
+    "menus": {
+      "editor/context": [
+        {
+          "command": "microhubs.createCapsule",
+          "when": "editorHasSelection",
+          "group": "microhubs"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.3.0"
+  }
+}

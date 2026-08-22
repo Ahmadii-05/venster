@@ -3,7 +3,7 @@ spring:
     name: microhubs-backend
 
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://127.0.0.1:5432/microhubs}
+    url: jdbc:postgresql://${DB_HOST:127.0.0.1}:${DB_PORT:5432}/${DB_NAME:microhubs}?stringtype=unspecified
     username: ${SPRING_DATASOURCE_USERNAME:microhubs}
     password: ${SPRING_DATASOURCE_PASSWORD:password}
 
@@ -14,6 +14,13 @@ spring:
     properties:
       hibernate:
         format_sql: true
+
+  task:
+    execution:
+      pool:
+        core-size: 2
+        max-size: 4
+        queue-capacity: 100
 
 server:
   port: 8082
@@ -26,3 +33,9 @@ springdoc:
     path: /v3/api-docs
   swagger-ui:
     path: /swagger-ui.html
+
+llm:
+  api:
+    key: ${LLM_API_KEY:}
+  base-url: ${LLM_BASE_URL:https://api.groq.com/openai/v1}
+  model: ${LLM_MODEL:openai/gpt-oss-20b}

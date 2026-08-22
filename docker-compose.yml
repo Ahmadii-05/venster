@@ -1,35 +1,45 @@
-version: '3.8'
-
 services:
   db:
-    image: postgres:15
+    image: pgvector/pgvector:pg16
     environment:
       POSTGRES_DB: microhubs
       POSTGRES_USER: microhubs
       POSTGRES_PASSWORD: password
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - ./microhubs-backend/database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
     ports:
-      - "5432:5432"
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U microhubs -d microhubs"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   backend:
-    build: ./backend
+    build: ./microhubs-backend
     ports:
-      - "8080:8080"
+      - "8082:8082"
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/microhubs
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/microhubs?stringtype=unspecified
       SPRING_DATASOURCE_USERNAME: microhubs
       SPRING_DATASOURCE_PASSWORD: password
-      JWT_SECRET: ${JWT_SECRET:default-secret-change-in-production}
-      LLM_API_KEY: ${LLM_API_KEY:}
+      JWT_SECRET: ${JWT_SECRET:-default-secret-change-in-production}
+      LLM_API_KEY: ${LLM_API_KEY:-your_groq_api_key_here}
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://api.groq.com/openai/v1}
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8082}
+    ports:
+      - "4173:80"
+    depends_on:
+      - backend
 
 volumes:
   pgdata:
-</task_progress>
-- [x] docker-compose.yml updated
-</task_progress>
-</write_to_file>
-
-</final_file_content>
