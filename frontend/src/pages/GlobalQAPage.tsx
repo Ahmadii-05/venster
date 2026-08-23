@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { globalQAApi } from "../services/api";
+import Icon from "../components/ui/Icon";
 import type { GlobalQuestion, GlobalAnswer } from "../types";
 import { useAuth } from "../context/AuthContext";
 
@@ -105,7 +106,7 @@ export default function GlobalQAPage() {
                 <h3 className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>{q.title}</h3>
                 <StatusBadge status={q.status} />
                 {q.reportCount > 0 && (
-                  <span className="text-xs" style={{ color: "var(--color-warning)" }}>⚠ {q.reportCount} reports</span>
+                  <span className="text-xs" style={{ color: "var(--color-warning)" }}><Icon name="alert" size={12} /> {q.reportCount} reports</span>
                 )}
               </div>
               <p className="text-xs line-clamp-2 mt-1" style={{ color: "var(--color-text-secondary)" }}>{q.body}</p>
@@ -286,7 +287,7 @@ function QuestionDetail({
               className="ml-auto text-xs transition-all hover:opacity-80"
               style={{ color: "var(--color-warning)" }}
             >
-              ⚑ Report
+              Report
             </button>
           )}
         </div>
@@ -321,7 +322,7 @@ function QuestionDetail({
                   </span>
                 )}
                 {a.reportCount > 0 && (
-                  <span className="text-xs" style={{ color: "var(--color-warning)" }}>⚠ {a.reportCount}</span>
+                  <span className="text-xs" style={{ color: "var(--color-warning)" }}><Icon name="alert" size={12} /> {a.reportCount}</span>
                 )}
               </div>
               <p className="text-sm whitespace-pre-wrap" style={{ color: "var(--color-text-secondary)" }}>{a.body}</p>
@@ -341,7 +342,7 @@ function QuestionDetail({
                     className="transition-all hover:opacity-80"
                     style={{ color: "var(--color-warning)" }}
                   >
-                    ⚑ Report
+                    Report
                   </button>
                 )}
               </div>

@@ -298,3 +298,56 @@ export const notificationApi = {
       method: "PATCH",
     }),
 };
+
+// ── Dashboard ───────────────────────────────────────────────
+export interface AgingCapsule {
+  capsuleId: string;
+  title: string;
+  status: string;
+  daysInCurrentStatus: number;
+  priority: string;
+}
+
+export interface HotArtifact {
+  artifactId: string;
+  filePath: string;
+  capsuleCount: number;
+  openCapsuleCount: number;
+}
+
+export interface KnowledgeHealth {
+  agingCapsules: AgingCapsule[];
+  hotArtifacts: HotArtifact[];
+}
+
+export interface SimilarKnowledgeItem {
+  knowledgeItemId: string;
+  title: string;
+  summary: string;
+  category: string;
+  confidence: number;
+  similarityScore: number;
+  source: "WORKSPACE" | "GLOBAL";
+}
+
+export const dashboardApi = {
+  getKnowledgeHealth: (workspaceId: string, agingThresholdDays?: number) => {
+    const q = new URLSearchParams({ workspaceId });
+    if (agingThresholdDays != null) q.set("agingThresholdDays", String(agingThresholdDays));
+    return request<KnowledgeHealth>(`/api/dashboard/knowledge-health?${q.toString()}`);
+  },
+};
+
+// ── Capsule Suggestions (Duplicate Detection) ──────────────
+export const capsuleSuggestionApi = {
+  suggestSimilar: (params: {
+    title: string;
+    description?: string;
+    workspaceId: string;
+    projectId?: string;
+  }) =>
+    request<SimilarKnowledgeItem[]>("/api/capsules/suggest-similar", {
+      method: "POST",
+      body: JSON.stringify(params),
+    }),
+};

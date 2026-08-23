@@ -24,57 +24,97 @@ public interface KnowledgeRepository extends JpaRepository<KnowledgeItem, UUID> 
     List<KnowledgeItem> findByVisibilityAndTitleContainingIgnoreCase(
             KnowledgeVisibility visibility, String title);
 
-    // ── pgvector similarity search (workspace-scoped) ────────
+    // -- pgvector similarity search (workspace-scoped) --
 
-    @Query(value = """
-            SELECT ki.*
-            FROM knowledge_items ki
-            WHERE ki.embedding IS NOT NULL
-            ORDER BY ki.embedding <=> CAST(:queryEmbedding AS vector)
-            LIMIT :limit
-            """, nativeQuery = true)
+    @Query(value = "SELECT ki.* " +
+            "FROM knowledge_items ki " +
+            "WHERE ki.embedding IS NOT NULL " +
+            "ORDER BY ki.embedding <=> CAST(:queryEmbedding AS vector) " +
+            "LIMIT :limit",
+            nativeQuery = true)
     List<KnowledgeItem> searchByEmbedding(
             @Param("queryEmbedding") String queryEmbedding,
             @Param("limit") int limit);
 
-    @Query(value = """
-            SELECT ki.*
-            FROM knowledge_items ki
-            WHERE ki.embedding IS NOT NULL
-            AND ki.category = :category
-            ORDER BY ki.embedding <=> CAST(:queryEmbedding AS vector)
-            LIMIT :limit
-            """, nativeQuery = true)
+    @Query(value = "SELECT ki.* " +
+            "FROM knowledge_items ki " +
+            "WHERE ki.embedding IS NOT NULL " +
+            "AND ki.category = :category " +
+            "ORDER BY ki.embedding <=> CAST(:queryEmbedding AS vector) " +
+            "LIMIT :limit",
+            nativeQuery = true)
     List<KnowledgeItem> searchByEmbeddingAndCategory(
             @Param("queryEmbedding") String queryEmbedding,
             @Param("category") String category,
             @Param("limit") int limit);
 
-    // ── pgvector similarity search (global / PUBLIC only) ─────
+    // -- pgvector similarity search (global / PUBLIC only) --
 
-    @Query(value = """
-            SELECT ki.*
-            FROM knowledge_items ki
-            WHERE ki.embedding IS NOT NULL
-            AND ki.visibility = 'PUBLIC'
-            ORDER BY ki.embedding <=> CAST(:queryEmbedding AS vector)
-            LIMIT :limit
-            """, nativeQuery = true)
+    @Query(value = "SELECT ki.* " +
+            "FROM knowledge_items ki " +
+            "WHERE ki.embedding IS NOT NULL " +
+            "AND ki.visibility = 'PUBLIC' " +
+            "ORDER BY ki.embedding <=> CAST(:queryEmbedding AS vector) " +
+            "LIMIT :limit",
+            nativeQuery = true)
     List<KnowledgeItem> searchPublicByEmbedding(
             @Param("queryEmbedding") String queryEmbedding,
             @Param("limit") int limit);
 
-    @Query(value = """
-            SELECT ki.*
-            FROM knowledge_items ki
-            WHERE ki.embedding IS NOT NULL
-            AND ki.visibility = 'PUBLIC'
-            AND ki.category = :category
-            ORDER BY ki.embedding <=> CAST(:queryEmbedding AS vector)
-            LIMIT :limit
-            """, nativeQuery = true)
+    @Query(value = "SELECT ki.* " +
+            "FROM knowledge_items ki " +
+            "WHERE ki.embedding IS NOT NULL " +
+            "AND ki.visibility = 'PUBLIC' " +
+            "AND ki.category = :category " +
+            "ORDER BY ki.embedding <=> CAST(:queryEmbedding AS vector) " +
+            "LIMIT :limit",
+            nativeQuery = true)
     List<KnowledgeItem> searchPublicByEmbeddingAndCategory(
             @Param("queryEmbedding") String queryEmbedding,
             @Param("category") String category,
+            @Param("limit") int limit);
+
+    // -- Threshold-based search for duplicate detection --
+
+    /**
+     * Workspace-scoped search with similarity threshold.
+     * Returns knowledge items whose embedding is within the given cosine distance threshold
+     * from the query embedding, belonging to the specified workspace.
+     */
+    @Query(value = "SELECT ki.* " +
+            "FROM knowledge_items ki " +
+            "JOIN resolutions r ON ki.resolution_id = r.id " +
+            "JOIN capsules c ON r.capsule_id = c.id " +
+            "JOIN artifact_anchors aa ON c.artifact_anchor_id = aa.id " +
+            "JOIN artifact_versions av ON aa.artifact_version_id = av.id " +
+            "JOIN artifacts a ON av.artifact_id = a.id " +
+            "JOIN projects p ON a.project_id = p.id " +
+            "WHERE ki.embedding IS NOT NULL " +
+            "AND p.workspace_id = :workspaceId " +
+            "AND ki.embedding <=> CAST(:queryEmbedding AS vector) <= :threshold " +
+            "ORDER BY ki.embedding <=> CAST(:queryEmbedding AS vector) " +
+            "LIMIT :limit",
+            nativeQuery = true)
+    List<KnowledgeItem> searchWorkspaceByEmbeddingWithThreshold(
+            @Param("queryEmbedding") String queryEmbedding,
+            @Param("workspaceId") UUID workspaceId,
+            @Param("threshold") double threshold,
+            @Param("limit") int limit);
+
+    /**
+     * Global PUBLIC search with similarity threshold.
+     * Returns PUBLIC knowledge items within the cosine distance threshold.
+     */
+    @Query(value = "SELECT ki.* " +
+            "FROM knowledge_items ki " +
+            "WHERE ki.embedding IS NOT NULL " +
+            "AND ki.visibility = 'PUBLIC' " +
+            "AND ki.embedding <=> CAST(:queryEmbedding AS vector) <= :threshold " +
+            "ORDER BY ki.embedding <=> CAST(:queryEmbedding AS vector) " +
+            "LIMIT :limit",
+            nativeQuery = true)
+    List<KnowledgeItem> searchPublicByEmbeddingWithThreshold(
+            @Param("queryEmbedding") String queryEmbedding,
+            @Param("threshold") double threshold,
             @Param("limit") int limit);
 }

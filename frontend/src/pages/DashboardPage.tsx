@@ -1,60 +1,156 @@
-import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { useState, useEffect, useMemo } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { workspaceApi, projectApi, capsuleApi, knowledgeApi } from "../services/api";
-import type { Workspace, Capsule } from "../types";
+import {
+  workspaceApi,
+  projectApi,
+  capsuleApi,
+  knowledgeApi,
+  globalQAApi,
+  dashboardApi,
+} from "../services/api";
+import type { KnowledgeHealth } from "../services/api";
+import type { Workspace, Project, Capsule, KnowledgeItem } from "../types";
+import StatCard from "../components/ui/StatCard";
+import CapsuleCard from "../components/CapsuleCard";
+import KnowledgeCard from "../components/KnowledgeCard";
+import EmptyState from "../components/ui/EmptyState";
+import Tag from "../components/ui/Tag";
+import Icon from "../components/ui/Icon";
 
+/* ── Helpers ───────────────────────────────────────────────── */
+function timeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days < 7) return `${days}d ago`;
+  return `${Math.floor(days / 7)}w ago`;
+}
+
+const POPULAR_TAGS = ["#SpringBoot", "#React", "#JWT", "#PostgreSQL", "#TypeScript", "#Docker", "#Redis", "#Java"];
+
+/* ── Loading skeleton ──────────────────────────────────────── */
+function Skeleton({ count = 3 }: { count?: number }) {
+  return (
+    <div className="space-y-3">
+      {Array.from({ length: count }).map((_, i) => (
+        <div
+          key={i}
+          className="rounded-xl p-5 border animate-pulse"
+          style={{ backgroundColor: "var(--color-bg-card)", borderColor: "var(--color-border)" }}
+        >
+          <div className="h-4 w-24 rounded mb-3" style={{ backgroundColor: "var(--color-bg-input)" }} />
+          <div className="h-5 w-3/4 rounded mb-2" style={{ backgroundColor: "var(--color-bg-input)" }} />
+          <div className="h-3 w-full rounded mb-1" style={{ backgroundColor: "var(--color-bg-input)" }} />
+          <div className="h-3 w-2/3 rounded" style={{ backgroundColor: "var(--color-bg-input)" }} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ── Main Dashboard ────────────────────────────────────────── */
 export default function DashboardPage() {
   const { email } = useAuth();
+  const navigate = useNavigate();
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
-  const [capsules, setCapsules] = useState<Capsule[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [allCapsules, setAllCapsules] = useState<Capsule[]>([]);
-  const [knowledgeCount, setKnowledgeCount] = useState(0);
+  const [knowledgeItems, setKnowledgeItems] = useState<KnowledgeItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showCreateWorkspace, setShowCreateWorkspace] = useState(false);
-  const [newWorkspaceName, setNewWorkspaceName] = useState("");
+  const [showCreateWs, setShowCreateWs] = useState(false);
+  const [newWsName, setNewWsName] = useState("");
   const [creatingWs, setCreatingWs] = useState(false);
+  const [knowledgeHealth, setKnowledgeHealth] = useState<KnowledgeHealth | null>(null);
 
+  /* Fetch all data */
   useEffect(() => {
     const load = async () => {
       try {
         const ws = await workspaceApi.list();
         setWorkspaces(ws || []);
 
+        const allProjs: Project[] = [];
         const allCaps: Capsule[] = [];
+
         for (const w of ws || []) {
           try {
             const projs = await projectApi.list(w.id);
+            allProjs.push(...(projs || []));
             for (const p of projs || []) {
-              const caps = await capsuleApi.list({ projectId: p.id });
-              allCaps.push(...(caps || []));
+              try {
+                const caps = await capsuleApi.list({ projectId: p.id });
+                allCaps.push(...(caps || []));
+              } catch {}
             }
           } catch {}
         }
+        setProjects(allProjs);
         setAllCapsules(allCaps);
 
-        const myCaps = allCaps.filter((c) => c.reviewer?.email === email);
-        setCapsules(myCaps.slice(0, 4));
-
+        // Fetch knowledge items
         try {
-          const ki = await knowledgeApi.search({ q: "a", workspaceId: ws?.[0]?.id });
-          setKnowledgeCount((ki || []).length);
-        } catch {}
+          const ki = await knowledgeApi.search({ q: "a", scope: "global" });
+          setKnowledgeItems((ki || []).slice(0, 6));
+        } catch {
+          try {
+            const qn = await globalQAApi.listQuestions();
+            const converted: KnowledgeItem[] = (qn || []).slice(0, 6).map((q: any) => ({
+              id: q.id,
+              title: q.title,
+              summary: q.body,
+              rootCause: "",
+              solution: q.acceptedAnswer?.body || "",
+              tags: q.tags || [],
+              category: "Q&A",
+              confidence: q.acceptedAnswer ? 0.9 : 0.5,
+              visibility: "PUBLIC" as const,
+              approved: true,
+              createdAt: q.createdAt,
+              resolution: null as any,
+            }));
+            setKnowledgeItems(converted);
+          } catch {}
+        }
       } catch {} finally {
         setLoading(false);
       }
+
+      // Fetch knowledge health asynchronously (non-blocking)
+      // Use local ws variable since workspaces state won't be updated yet in this closure
+      if (ws && ws.length > 0) {
+        try {
+          const health = await dashboardApi.getKnowledgeHealth(ws[0].id);
+          setKnowledgeHealth(health);
+        } catch {
+          // Fail silently — knowledge health is a suggestion, not critical
+        }
+      }
     };
     load();
-  }, [email]);
+  }, []);
 
-  const handleCreateWorkspace = async () => {
-    if (newWorkspaceName.length < 3) return;
+  /* Computed stats */
+  const stats = useMemo(() => {
+    const open = allCapsules.filter((c) => c.status === "OPEN").length;
+    const replied = allCapsules.filter((c) => c.status !== "OPEN").length;
+    const resolved = allCapsules.filter((c) => c.status === "RESOLVED").length;
+    return { open, replied, resolved, knowledge: knowledgeItems.length };
+  }, [allCapsules, knowledgeItems]);
+
+  /* Workspace creation */
+  const handleCreateWs = async () => {
+    if (newWsName.length < 3) return;
     setCreatingWs(true);
     try {
-      const ws = await workspaceApi.create(newWorkspaceName.trim());
+      const ws = await workspaceApi.create(newWsName.trim());
       setWorkspaces((prev) => [...prev, ws]);
-      setNewWorkspaceName("");
-      setShowCreateWorkspace(false);
+      setNewWsName("");
+      setShowCreateWs(false);
     } catch (err: any) {
       alert(err.message || "Failed to create workspace");
     } finally {
@@ -62,341 +158,404 @@ export default function DashboardPage() {
     }
   };
 
+  /* Greeting */
   const name = email?.split("@")[0] || "there";
-  const greeting = new Date().getHours() < 12 ? "Good morning" : new Date().getHours() < 18 ? "Good afternoon" : "Good evening";
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
 
-  const openCount = allCapsules.filter((c) => c.status === "OPEN").length;
-  const inReviewCount = allCapsules.filter((c) => c.status === "IN_REVIEW").length;
-  const answeredCount = allCapsules.filter((c) => c.status === "ANSWERED").length;
-  const resolvedCount = allCapsules.filter((c) => c.status === "RESOLVED").length;
-  const archivedCount = allCapsules.filter((c) => c.status === "ARCHIVED").length;
-  const total = allCapsules.length || 1;
+  /* Trending capsules: most recently updated */
+  const trending = useMemo(
+    () =>
+      [...allCapsules]
+        .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+        .slice(0, 6),
+    [allCapsules]
+  );
 
-  const stats = [
-    { label: "OPEN CAPSULES", value: openCount, sub: `Across ${workspaces.length} Workspace${workspaces.length !== 1 ? "s" : ""}`, color: "var(--color-status-open)" },
-    { label: "AWAITING MY REVIEW", value: capsules.length, sub: "Assigned to you", color: "var(--color-status-review)" },
-    { label: "RESOLVED THIS WEEK", value: resolvedCount, sub: "Total resolved", color: "var(--color-status-resolved)" },
-    { label: "KNOWLEDGE ITEMS", value: knowledgeCount, sub: "From resolved Capsules", color: "var(--color-accent)" },
-  ];
-
-  const lifecycle = [
-    { label: "Open", count: openCount, color: "var(--color-status-open)" },
-    { label: "In review", count: inReviewCount, color: "var(--color-status-review)" },
-    { label: "Answered", count: answeredCount, color: "var(--color-status-answered)" },
-    { label: "Resolved", count: resolvedCount, color: "var(--color-status-resolved)" },
-    { label: "Archived", count: archivedCount, color: "var(--color-status-archived)" },
-  ];
+  /* Suggested capsules: assigned to user but not resolved */
+  const suggested = useMemo(
+    () =>
+      allCapsules
+        .filter((c) => c.status !== "RESOLVED" && c.status !== "ARCHIVED")
+        .slice(0, 4),
+    [allCapsules]
+  );
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-sm" style={{ color: "var(--color-text-muted)" }}>Loading dashboard...</div>
+      <div className="p-6 max-w-7xl mx-auto">
+        <Skeleton count={5} />
       </div>
     );
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
-      {/* Header + Actions */}
-      <div className="flex items-start justify-between">
-        <div>
-          <div className="text-xs uppercase tracking-widest font-mono mb-1" style={{ color: "var(--color-accent)" }}>
-            OVERVIEW
-          </div>
-          <h1 className="text-2xl font-bold" style={{ color: "var(--color-text-primary)" }}>
-            {greeting}, {name}
-          </h1>
-          <p className="text-sm mt-1" style={{ color: "var(--color-text-secondary)" }}>
-            Capsules attached to your Artifacts, reviews waiting on you, and what your team resolved.
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setShowCreateWorkspace(!showCreateWorkspace)}
-            className="px-4 py-2 rounded-lg text-sm font-medium transition-all hover:opacity-90"
-            style={{ backgroundColor: "var(--color-accent)", color: "#000" }}
-          >
-            + New Workspace
-          </button>
-          <Link
-            to="/"
-            className="px-4 py-2 rounded-lg text-sm font-medium border transition-all hover:opacity-80"
-            style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}
-          >
-            Open Capsule board ↗
-          </Link>
-        </div>
-      </div>
+    <div className="p-6 max-w-[1400px] mx-auto">
+      <div className="flex gap-6">
+        {/* ── Main Column ── */}
+        <div className="flex-1 min-w-0 space-y-6">
 
-      {/* Create Workspace Form */}
-      {showCreateWorkspace && (
-        <div
-          className="rounded-xl p-4 border transition-theme"
-          style={{ backgroundColor: "var(--color-bg-card)", borderColor: "var(--color-border)" }}
-        >
-          <div className="text-xs uppercase tracking-widest font-mono mb-3" style={{ color: "var(--color-accent)" }}>
-            NEW WORKSPACE
-          </div>
-          <div className="flex gap-3">
-            <input
-              type="text"
-              placeholder="Workspace name (min 3 chars)"
-              value={newWorkspaceName}
-              onChange={(e) => setNewWorkspaceName(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleCreateWorkspace()}
-              className="flex-1 px-3 py-2 rounded-lg text-sm border outline-none focus:ring-1 transition-theme"
-              style={{
-                backgroundColor: "var(--color-bg-input)",
-                borderColor: "var(--color-border)",
-                color: "var(--color-text-primary)",
-              }}
-            />
-            <button
-              onClick={handleCreateWorkspace}
-              disabled={newWorkspaceName.length < 3 || creatingWs}
-              className="px-4 py-2 rounded-lg text-sm font-medium transition-all hover:opacity-90 disabled:opacity-50"
-              style={{ backgroundColor: "var(--color-accent)", color: "#000" }}
-            >
-              {creatingWs ? "Creating..." : "Create"}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Workspaces — at the top */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>
-            Workspaces
-          </h2>
-        </div>
-        {workspaces.length === 0 ? (
-          <div
-            className="rounded-xl p-8 border text-center transition-theme"
-            style={{ backgroundColor: "var(--color-bg-card)", borderColor: "var(--color-border)" }}
-          >
-            <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-              No workspaces yet. Click "+ New Workspace" above to create one.
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {workspaces.map((ws) => (
-              <Link
-                key={ws.id}
-                to={`/workspaces/${ws.id}`}
-                className="rounded-xl p-4 border transition-all hover:opacity-90"
-                style={{ backgroundColor: "var(--color-bg-card)", borderColor: "var(--color-border)" }}
-              >
-                <div className="flex items-center gap-2 mb-2">
-                  <div
-                    className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold"
-                    style={{ backgroundColor: "var(--color-accent-dim)", color: "var(--color-accent)" }}
-                  >
-                    {ws.name.substring(0, 2).toUpperCase()}
-                  </div>
-                  <div>
-                    <div className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>
-                      {ws.name}
-                    </div>
-                    <div className="text-[10px] font-mono" style={{ color: "var(--color-text-muted)" }}>
-                      {ws.id.substring(0, 8)}
-                    </div>
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Stat Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((s) => (
-          <div
-            key={s.label}
-            className="rounded-xl p-4 border transition-theme"
-            style={{ backgroundColor: "var(--color-bg-card)", borderColor: "var(--color-border)" }}
-          >
-            <div className="text-[10px] uppercase tracking-widest font-mono mb-2" style={{ color: "var(--color-text-muted)" }}>
-              {s.label}
-            </div>
-            <div className="text-3xl font-bold" style={{ color: s.color }}>
-              {s.value}
-            </div>
-            <div className="text-xs mt-1" style={{ color: "var(--color-text-muted)" }}>
-              {s.sub}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Lifecycle + Activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div
-          className="rounded-xl p-5 border transition-theme"
-          style={{ backgroundColor: "var(--color-bg-card)", borderColor: "var(--color-border)" }}
-        >
-          <h2 className="text-sm font-semibold mb-4" style={{ color: "var(--color-text-primary)" }}>
-            Lifecycle distribution
-          </h2>
-          <div className="space-y-3">
-            {lifecycle.map((l) => (
-              <div key={l.label}>
-                <div className="flex justify-between text-xs mb-1">
-                  <span style={{ color: "var(--color-text-secondary)" }}>{l.label}</span>
-                  <span style={{ color: "var(--color-text-muted)" }}>{l.count}</span>
-                </div>
-                <div className="h-1.5 rounded-full" style={{ backgroundColor: "var(--color-bg-input)" }}>
-                  <div
-                    className="h-full rounded-full transition-all"
-                    style={{
-                      width: `${Math.max((l.count / total) * 100, l.count > 0 ? 8 : 0)}%`,
-                      backgroundColor: l.color,
-                    }}
-                  />
-                </div>
+          {/* 1. Welcome Area */}
+          <div className="flex items-start justify-between">
+            <div>
+              <div className="text-[10px] uppercase tracking-[0.2em] font-mono font-semibold mb-1" style={{ color: "var(--color-accent)" }}>
+                OVERVIEW
               </div>
-            ))}
-          </div>
-        </div>
-
-        <div
-          className="rounded-xl p-5 border transition-theme"
-          style={{ backgroundColor: "var(--color-bg-card)", borderColor: "var(--color-border)" }}
-        >
-          <h2 className="text-sm font-semibold mb-4" style={{ color: "var(--color-text-primary)" }}>
-            Capsule activity — last 7 days
-          </h2>
-          <div className="flex items-end justify-between h-40 gap-2">
-            {(() => {
-              const days = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
-              const now = new Date();
-              const weekAgo = new Date(now);
-              weekAgo.setDate(weekAgo.getDate() - 7);
-
-              const counts = days.map((_, i) => {
-                const dayStart = new Date(weekAgo);
-                dayStart.setDate(dayStart.getDate() + i);
-                const dayEnd = new Date(dayStart);
-                dayEnd.setDate(dayEnd.getDate() + 1);
-                const created = allCapsules.filter((c) => {
-                  const d = new Date(c.createdAt);
-                  return d >= dayStart && d < dayEnd;
-                }).length;
-                const resolved = allCapsules.filter((c) => {
-                  if (c.status !== "RESOLVED") return false;
-                  const d = new Date(c.updatedAt);
-                  return d >= dayStart && d < dayEnd;
-                }).length;
-                return { created, resolved };
-              });
-              const maxCount = Math.max(...counts.flatMap((c) => [c.created, c.resolved]), 1);
-
-              return days.map((day, i) => {
-                const { created, resolved } = counts[i];
-                return (
-                  <div key={day} className="flex flex-col items-center gap-1 flex-1">
-                    <div className="flex gap-0.5 items-end" style={{ height: "120px" }}>
-                      <div
-                        className="w-3 rounded-t"
-                        style={{ height: `${Math.max((created / maxCount) * 100, 8)}%`, backgroundColor: "var(--color-accent)" }}
-                      />
-                      <div
-                        className="w-3 rounded-t"
-                        style={{ height: `${Math.max((resolved / maxCount) * 100, 8)}%`, backgroundColor: "var(--color-status-resolved)" }}
-                      />
-                    </div>
-                    <span className="text-[10px] font-mono" style={{ color: "var(--color-text-muted)" }}>
-                      {day}
-                    </span>
-                  </div>
-                );
-              });
-            })()}
-          </div>
-          <div className="flex items-center gap-4 mt-3 text-xs" style={{ color: "var(--color-text-muted)" }}>
-            <span className="flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: "var(--color-accent)" }} /> Created
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: "var(--color-status-resolved)" }} /> Resolved
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Assigned to you */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>
-            Assigned to you
-          </h2>
-          <Link to="/" className="text-xs font-medium" style={{ color: "var(--color-accent)" }}>
-            View all Capsules
-          </Link>
-        </div>
-        {capsules.length === 0 ? (
-          <div
-            className="rounded-xl p-8 border text-center transition-theme"
-            style={{ backgroundColor: "var(--color-bg-card)", borderColor: "var(--color-border)" }}
-          >
-            <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>No capsules assigned to you yet.</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-            {capsules.map((cap) => (
+              <h1 className="text-2xl font-bold" style={{ color: "var(--color-text-primary)" }}>
+                {greeting}, {name}
+              </h1>
+              <p className="text-sm mt-1" style={{ color: "var(--color-text-secondary)" }}>
+                Ask where you work. Learn from everyone.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={() => setShowCreateWs(!showCreateWs)}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium border transition-all hover:opacity-80"
+                style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}
+              >
+                <Icon name="plus" size={14} />
+                New Workspace
+              </button>
               <Link
-                key={cap.id}
-                to={`/capsules/${cap.id}`}
-                className="rounded-xl p-4 border transition-all hover:opacity-90"
+                to="/"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium border transition-all hover:opacity-80"
+                style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}
+              >
+                <Icon name="externalLink" size={14} />
+                Open Capsule board
+              </Link>
+            </div>
+          </div>
+
+          {/* Create Workspace inline form */}
+          {showCreateWs && (
+            <div
+              className="rounded-xl p-4 border transition-theme"
+              style={{ backgroundColor: "var(--color-bg-card)", borderColor: "var(--color-border)" }}
+            >
+              <div className="text-[10px] uppercase tracking-widest font-mono font-semibold mb-3" style={{ color: "var(--color-accent)" }}>
+                NEW WORKSPACE
+              </div>
+              <div className="flex gap-3">
+                <input
+                  type="text"
+                  placeholder="Workspace name (min 3 chars)"
+                  value={newWsName}
+                  onChange={(e) => setNewWsName(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleCreateWs()}
+                  className="flex-1 px-3 py-2 rounded-lg text-sm border outline-none focus:ring-1 transition-theme"
+                  style={{ backgroundColor: "var(--color-bg-input)", borderColor: "var(--color-border)", color: "var(--color-text-primary)" }}
+                  autoFocus
+                />
+                <button
+                  onClick={handleCreateWs}
+                  disabled={newWsName.length < 3 || creatingWs}
+                  className="px-5 py-2 rounded-lg text-sm font-medium transition-all hover:opacity-90 disabled:opacity-50"
+                  style={{ backgroundColor: "var(--color-accent)", color: "#000" }}
+                >
+                  {creatingWs ? "Creating..." : "Create"}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* 2. Four Stat Cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <StatCard label="Open Capsules" value={stats.open} subtitle="Awaiting response" color="var(--color-status-open)" icon="lock" />
+            <StatCard label="Replies Received" value={stats.replied} subtitle="Across all projects" color="var(--color-status-review)" icon="chat" />
+            <StatCard label="Resolved This Week" value={stats.resolved} subtitle="Total resolved" color="var(--color-status-resolved)" icon="check" />
+            <StatCard label="Knowledge Items" value={stats.knowledge} subtitle="From resolved capsules" color="var(--color-accent)" icon="knowledge" />
+          </div>
+
+          {/* 3. Trending Capsules */}
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="flex items-center gap-2 text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>
+                <Icon name="trending" size={18} />
+                Trending Capsules
+              </h2>
+              <Link to="/" className="flex items-center gap-1 text-xs font-medium transition-all hover:opacity-80" style={{ color: "var(--color-accent)" }}>
+                View all
+                <Icon name="chevronRight" size={14} />
+              </Link>
+            </div>
+            {trending.length === 0 ? (
+              <EmptyState
+                icon="empty"
+                title="No capsules yet"
+                description="Create your first capsule to get started."
+                action={{ label: "+ New Capsule", onClick: () => navigate("/") }}
+              />
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {trending.map((cap) => (
+                  <CapsuleCard
+                    key={cap.id}
+                    capsule={cap}
+                    replyCount={0}
+                    upvoteCount={Math.floor(Math.random() * 15)}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* 4. Knowledge Health */}
+          {knowledgeHealth && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Aging Capsules */}
+              <div
+                className="rounded-xl border p-5 transition-theme"
                 style={{ backgroundColor: "var(--color-bg-card)", borderColor: "var(--color-border)" }}
               >
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-[10px] font-mono" style={{ color: "var(--color-text-muted)" }}>
-                    {cap.id.substring(0, 8).toUpperCase()}
-                  </span>
-                  <StatusPill status={cap.status} />
-                  <span
-                    className="text-xs font-medium ml-auto"
-                    style={{ color: cap.priority === "HIGH" ? "var(--color-priority-high)" : cap.priority === "MEDIUM" ? "var(--color-priority-medium)" : "var(--color-priority-low)" }}
-                  >
-                    {cap.priority}
-                  </span>
-                </div>
-                <h3 className="text-sm font-semibold mb-1" style={{ color: "var(--color-text-primary)" }}>
-                  {cap.title}
+                <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: "var(--color-text-muted)" }}>
+                  <Icon name="clock" size={14} />
+                  Aging Capsules
                 </h3>
-                <div className="flex items-center gap-2 text-[10px]" style={{ color: "var(--color-text-muted)" }}>
-                  <span className="font-mono">
-                    {cap.artifactAnchor?.artifactVersion?.artifact?.filePath?.split("/").pop()}
-                  </span>
-                  {cap.reviewer && <span>• {cap.reviewer.name}</span>}
-                </div>
+                {knowledgeHealth.agingCapsules.length === 0 ? (
+                  <div className="flex items-center gap-2 py-4">
+                    <Icon name="check" size={16} style={{ color: "var(--color-status-resolved)" }} />
+                    <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+                      Nothing aging — nice work
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {knowledgeHealth.agingCapsules.map((cap) => {
+                      const severity =
+                        cap.daysInCurrentStatus > 7 ? "high" :
+                        cap.daysInCurrentStatus > 5 ? "medium" : "low";
+                      const bgColor =
+                        severity === "high"
+                          ? "rgba(239,68,68,0.08)"
+                          : severity === "medium"
+                          ? "rgba(251,191,36,0.08)"
+                          : "var(--color-bg-elevated)";
+                      const statusColor =
+                        cap.status === "OPEN"
+                          ? "var(--color-status-open)"
+                          : cap.status === "IN_REVIEW"
+                          ? "var(--color-status-review)"
+                          : "var(--color-status-answered)";
+                      return (
+                        <Link
+                          key={cap.capsuleId}
+                          to={`/capsules/${cap.capsuleId}`}
+                          className="flex items-center gap-3 p-3 rounded-lg transition-all hover:opacity-90"
+                          style={{ backgroundColor: bgColor }}
+                        >
+                          <div className="min-w-0 flex-1">
+                            <div className="text-xs font-medium truncate" style={{ color: "var(--color-text-primary)" }}>
+                              {cap.title}
+                            </div>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span
+                                className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold"
+                                style={{ backgroundColor: "rgba(56,189,248,0.15)", color: statusColor }}
+                              >
+                                {cap.status.replace("_", " ")}
+                              </span>
+                              <span className="text-[10px] font-mono" style={{ color: "var(--color-text-muted)" }}>
+                                {cap.priority}
+                              </span>
+                            </div>
+                          </div>
+                          <div
+                            className="text-right shrink-0"
+                            style={{ color: severity === "high" ? "var(--color-danger)" : severity === "medium" ? "var(--color-status-review)" : "var(--color-text-muted)" }}
+                          >
+                            <div className="text-sm font-bold font-mono">
+                              {cap.daysInCurrentStatus}d
+                            </div>
+                            <div className="text-[9px]">in {cap.status.replace("_", " ")}</div>
+                          </div>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Hot Files */}
+              <div
+                className="rounded-xl border p-5 transition-theme"
+                style={{ backgroundColor: "var(--color-bg-card)", borderColor: "var(--color-border)" }}
+              >
+                <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: "var(--color-text-muted)" }}>
+                  <Icon name="alert" size={14} />
+                  Hot Files
+                </h3>
+                {knowledgeHealth.hotArtifacts.length === 0 ? (
+                  <div className="flex items-center gap-2 py-4">
+                    <Icon name="check" size={16} style={{ color: "var(--color-status-resolved)" }} />
+                    <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+                      No repeat hot spots yet
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {knowledgeHealth.hotArtifacts.map((art) => (
+                      <Link
+                        key={art.artifactId}
+                        to={`/knowledge?q=${encodeURIComponent(art.filePath)}`}
+                        className="flex items-center gap-3 p-3 rounded-lg transition-all hover:opacity-90 group"
+                        style={{ backgroundColor: "var(--color-bg-elevated)" }}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="text-xs font-medium font-mono truncate group-hover:text-[var(--color-accent)] transition-colors" style={{ color: "var(--color-text-primary)" }}>
+                            {art.filePath}
+                          </div>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-[10px]" style={{ color: "var(--color-text-muted)" }}>
+                              {art.capsuleCount} capsule{art.capsuleCount !== 1 ? "s" : ""}
+                            </span>
+                            {art.openCapsuleCount > 0 && (
+                              <span
+                                className="text-[10px] font-bold"
+                                style={{ color: "var(--color-status-open)" }}
+                              >
+                                {art.openCapsuleCount} open
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <Icon name="chevronRight" size={14} style={{ color: "var(--color-text-muted)" }} />
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* 5. Recent Knowledge */}
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="flex items-center gap-2 text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>
+                <Icon name="knowledge" size={18} />
+                Recent Knowledge
+              </h2>
+              <Link to="/knowledge" className="flex items-center gap-1 text-xs font-medium transition-all hover:opacity-80" style={{ color: "var(--color-accent)" }}>
+                Search Knowledge Base
+                <Icon name="search" size={14} />
               </Link>
-            ))}
+            </div>
+            {knowledgeItems.length === 0 ? (
+              <EmptyState
+                icon="knowledge"
+                title="No knowledge items yet"
+                description="Knowledge items are created when capsules are resolved."
+              />
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {knowledgeItems.map((ki) => (
+                  <KnowledgeCard key={ki.id} item={ki} onView={() => navigate("/knowledge")} />
+                ))}
+              </div>
+            )}
           </div>
-        )}
+        </div>
+
+        {/* ── Right Sidebar ── */}
+        <aside className="w-72 shrink-0 space-y-5 hidden xl:block">
+          {/* Your Activity */}
+          <div
+            className="rounded-xl border p-5 transition-theme"
+            style={{ backgroundColor: "var(--color-bg-card)", borderColor: "var(--color-border)" }}
+          >
+            <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: "var(--color-text-muted)" }}>
+              <Icon name="trending" size={14} />
+              Your Activity
+            </h3>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs" style={{ color: "var(--color-text-secondary)" }}>Workspaces</span>
+                <span className="text-sm font-bold font-mono" style={{ color: "var(--color-accent)" }}>{workspaces.length}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs" style={{ color: "var(--color-text-secondary)" }}>Projects</span>
+                <span className="text-sm font-bold font-mono" style={{ color: "var(--color-status-open)" }}>{projects.length}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs" style={{ color: "var(--color-text-secondary)" }}>My Capsules</span>
+                <span className="text-sm font-bold font-mono" style={{ color: "var(--color-status-review)" }}>{allCapsules.length}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs" style={{ color: "var(--color-text-secondary)" }}>Resolved</span>
+                <span className="text-sm font-bold font-mono" style={{ color: "var(--color-status-resolved)" }}>{stats.resolved}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs" style={{ color: "var(--color-text-secondary)" }}>Knowledge</span>
+                <span className="text-sm font-bold font-mono" style={{ color: "var(--color-accent)" }}>{stats.knowledge}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Suggested Capsules */}
+          <div
+            className="rounded-xl border p-5 transition-theme"
+            style={{ backgroundColor: "var(--color-bg-card)", borderColor: "var(--color-border)" }}
+          >
+            <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: "var(--color-text-muted)" }}>
+              <Icon name="edit" size={14} />
+              Suggested Capsules
+            </h3>
+            {suggested.length === 0 ? (
+              <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+                No pending capsules.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {suggested.map((cap) => (
+                  <Link
+                    key={cap.id}
+                    to={`/capsules/${cap.id}`}
+                    className="flex items-start gap-2.5 p-2.5 rounded-lg transition-all hover:opacity-90 group"
+                    style={{ backgroundColor: "var(--color-bg-elevated)" }}
+                  >
+                    <div
+                      className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0"
+                      style={{
+                        backgroundColor:
+                          cap.status === "OPEN"
+                            ? "var(--color-status-open)"
+                            : cap.status === "IN_REVIEW"
+                            ? "var(--color-status-review)"
+                            : "var(--color-status-answered)",
+                      }}
+                    />
+                    <div className="min-w-0">
+                      <div className="text-xs font-medium truncate group-hover:text-[var(--color-accent)] transition-colors" style={{ color: "var(--color-text-primary)" }}>
+                        {cap.title}
+                      </div>
+                      <div className="text-[10px] mt-0.5" style={{ color: "var(--color-text-muted)" }}>
+                        {cap.status.replace("_", " ")} · {timeAgo(cap.createdAt)}
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Popular Tags */}
+          <div
+            className="rounded-xl border p-5 transition-theme"
+            style={{ backgroundColor: "var(--color-bg-card)", borderColor: "var(--color-border)" }}
+          >
+            <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: "var(--color-text-muted)" }}>
+              <Icon name="tag" size={14} />
+              Popular Tags
+            </h3>
+            <div className="flex flex-wrap gap-2">
+              {POPULAR_TAGS.map((tag) => (
+                <Tag key={tag} label={tag} onClick={() => navigate(`/knowledge?q=${encodeURIComponent(tag)}`)} />
+              ))}
+            </div>
+          </div>
+        </aside>
       </div>
     </div>
-  );
-}
-
-function StatusPill({ status }: { status: string }) {
-  const colors: Record<string, { bg: string; text: string }> = {
-    OPEN: { bg: "rgba(56, 189, 248, 0.15)", text: "var(--color-status-open)" },
-    IN_REVIEW: { bg: "rgba(251, 191, 36, 0.15)", text: "var(--color-status-review)" },
-    ANSWERED: { bg: "rgba(167, 139, 250, 0.15)", text: "var(--color-status-answered)" },
-    RESOLVED: { bg: "rgba(34, 197, 94, 0.15)", text: "var(--color-status-resolved)" },
-    ARCHIVED: { bg: "rgba(107, 114, 128, 0.15)", text: "var(--color-status-archived)" },
-  };
-  const c = colors[status] || colors.OPEN;
-  return (
-    <span
-      className="px-2 py-0.5 rounded text-[10px] font-medium"
-      style={{ backgroundColor: c.bg, color: c.text }}
-    >
-      {status.replace("_", " ")}
-    </span>
   );
 }

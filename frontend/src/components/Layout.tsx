@@ -1,18 +1,21 @@
-import { useState, type ReactNode } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { notificationApi } from "../services/api";
-import { useEffect } from "react";
 import type { Notification } from "../types";
+import NewCapsuleModal from "./NewCapsuleModal";
+import Avatar from "./ui/Avatar";
+import Icon from "./ui/Icon";
 
-const NAV_ITEMS = [
-  { path: "/", label: "Workspaces" },
-  { path: "/knowledge", label: "Knowledge" },
-  { path: "/knowledge/global", label: "Global Knowledge" },
-  { path: "/community", label: "Community Q&A" },
-  { path: "/notifications", label: "Notifications" },
-  { path: "/profile", label: "Profile" },
+const SIDEBAR_ITEMS = [
+  { path: "/", label: "Dashboard", icon: "dashboard" as const },
+  { path: "/workspaces", label: "Workspaces", icon: "folder" as const },
+  { path: "/knowledge", label: "Knowledge Base", icon: "book" as const },
+  { path: "/knowledge/global", label: "Global Knowledge", icon: "globe" as const },
+  { path: "/community", label: "Community Q&A", icon: "chat" as const },
+  { path: "/notifications", label: "Notifications", icon: "bell" as const },
+  { path: "/profile", label: "Profile", icon: "user" as const },
 ];
 
 export default function Layout({ children }: { children: ReactNode }) {
@@ -22,8 +25,12 @@ export default function Layout({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [showNewCapsule, setShowNewCapsule] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
+  const userName = email?.split("@")[0] || "User";
 
   useEffect(() => {
     const fetchNotifs = async () => {
@@ -37,34 +44,41 @@ export default function Layout({ children }: { children: ReactNode }) {
     return () => clearInterval(interval);
   }, []);
 
-  const initials = email ? email.substring(0, 2).toUpperCase() : "U";
+  const isActive = (path: string) => {
+    if (path === "/") return location.pathname === "/";
+    if (path === "/workspaces")
+      return location.pathname.startsWith("/workspaces") || location.pathname.startsWith("/projects");
+    if (path === "/knowledge/global")
+      return location.pathname.startsWith("/knowledge/global");
+    return location.pathname === path;
+  };
 
   return (
     <div className="flex h-screen overflow-hidden transition-theme" style={{ backgroundColor: "var(--color-bg-primary)" }}>
-      {/* Sidebar */}
+      {/* ── Sidebar ── */}
       <aside
-        className="flex flex-col transition-all duration-300 border-r"
+        className="flex flex-col transition-all duration-300 border-r shrink-0"
         style={{
-          width: collapsed ? "64px" : "240px",
+          width: collapsed ? "64px" : "232px",
           backgroundColor: "var(--color-bg-card)",
           borderColor: "var(--color-border)",
         }}
       >
         {/* Brand */}
-        <div className="p-4 border-b" style={{ borderColor: "var(--color-border)" }}>
-          <div className="flex items-center gap-2">
+        <div className="px-4 py-4 border-b" style={{ borderColor: "var(--color-border)" }}>
+          <div className="flex items-center gap-2.5">
             <div
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold"
+              className="w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold shrink-0"
               style={{ backgroundColor: "var(--color-accent)", color: "#000" }}
             >
               V
             </div>
             {!collapsed && (
               <div>
-                <div className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>
+                <div className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }}>
                   Venster
                 </div>
-                <div className="text-[10px] uppercase tracking-widest" style={{ color: "var(--color-text-muted)" }}>
+                <div className="text-[9px] uppercase tracking-[0.15em] font-mono" style={{ color: "var(--color-text-muted)" }}>
                   Capsule Workflow
                 </div>
               </div>
@@ -73,30 +87,34 @@ export default function Layout({ children }: { children: ReactNode }) {
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
-          {NAV_ITEMS.map((item) => {
-            const active = item.path === "/"
-              ? location.pathname === "/" || location.pathname.startsWith("/workspaces")
-              : item.path === "/knowledge/global"
-              ? location.pathname.startsWith("/knowledge/global")
-              : location.pathname === item.path;
-            return (                <Link
+        <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto">
+          {SIDEBAR_ITEMS.map((item) => {
+            const active = isActive(item.path);
+            return (
+              <Link
                 key={item.path}
                 to={item.path}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all"
+                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all group"
                 style={{
                   backgroundColor: active ? "var(--color-accent-dim)" : "transparent",
                   color: active ? "var(--color-accent)" : "var(--color-text-secondary)",
                 }}
               >
-                {!collapsed && <span>{item.label}</span>}
-                {!collapsed && item.path === "/notifications" && unreadCount > 0 && (
-                  <span
-                    className="ml-auto px-1.5 py-0.5 rounded-full text-[10px] font-bold"
-                    style={{ backgroundColor: "var(--color-danger)", color: "#fff" }}
-                  >
-                    {unreadCount}
-                  </span>
+                <span className="w-5 h-5 flex items-center justify-center shrink-0">
+                  <Icon name={item.icon} size={18} />
+                </span>
+                {!collapsed && (
+                  <>
+                    <span className={active ? "font-medium" : ""}>{item.label}</span>
+                    {item.label === "Notifications" && unreadCount > 0 && (
+                      <span
+                        className="ml-auto px-1.5 py-0.5 rounded-full text-[9px] font-bold"
+                        style={{ backgroundColor: "var(--color-danger)", color: "#fff" }}
+                      >
+                        {unreadCount}
+                      </span>
+                    )}
+                  </>
                 )}
               </Link>
             );
@@ -104,31 +122,38 @@ export default function Layout({ children }: { children: ReactNode }) {
         </nav>
 
         {/* Collapse + Logout */}
-        <div className="p-2 border-t space-y-1" style={{ borderColor: "var(--color-border)" }}>
+        <div className="p-2 border-t space-y-0.5" style={{ borderColor: "var(--color-border)" }}>
           <button
             onClick={() => setCollapsed(!collapsed)}
-            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm w-full transition-all hover:opacity-80"
+            className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm w-full transition-all hover:opacity-80"
             style={{ color: "var(--color-text-muted)" }}
           >
-            <span className="text-base w-5 text-center">{collapsed ? "»" : "«"}</span>
-            {!collapsed && <span>Collapse</span>}
+            <span className="w-5 h-5 flex items-center justify-center shrink-0">
+              <Icon name={collapsed ? "chevronRight" : "chevronLeft"} size={18} />
+            </span>
+            {!collapsed && <span className="text-xs">Collapse</span>}
           </button>
           {!collapsed && (
             <button
-              onClick={() => { logout(); navigate("/login"); }}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm w-full transition-all hover:opacity-80"
-              style={{ color: "var(--color-danger)" }}
+              onClick={() => {
+                logout();
+                navigate("/login");
+              }}
+              className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm w-full transition-all hover:opacity-80"
+              style={{ color: "var(--color-text-muted)" }}
             >
-              <span className="text-base w-5 text-center">⏻</span>
-              <span>Logout</span>
+              <span className="w-5 h-5 flex items-center justify-center shrink-0">
+                <Icon name="logout" size={18} />
+              </span>
+              <span className="text-xs">Logout</span>
             </button>
           )}
         </div>
       </aside>
 
-      {/* Main */}
+      {/* ── Main Content ── */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Topbar */}
+        {/* Top Bar */}
         <header
           className="flex items-center gap-4 px-6 h-14 border-b shrink-0"
           style={{
@@ -139,12 +164,22 @@ export default function Layout({ children }: { children: ReactNode }) {
           {/* Search */}
           <div className="flex-1 max-w-xl">
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm" style={{ color: "var(--color-text-muted)" }}>
-                ⌕
+              <span
+                className="absolute left-3 top-1/2 -translate-y-1/2"
+                style={{ color: "var(--color-text-muted)" }}
+              >
+                <Icon name="search" size={16} />
               </span>
               <input
                 type="text"
-                placeholder="Search Capsules, Artifacts, Knowledge..."
+                placeholder="Search capsules and knowledge..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && searchQuery.trim()) {
+                    navigate(`/knowledge?q=${encodeURIComponent(searchQuery.trim())}`);
+                  }
+                }}
                 className="w-full pl-9 pr-4 py-2 rounded-lg text-sm border outline-none focus:ring-1 transition-theme"
                 style={{
                   backgroundColor: "var(--color-bg-input)",
@@ -155,13 +190,31 @@ export default function Layout({ children }: { children: ReactNode }) {
             </div>
           </div>
 
-          {/* Actions */}
-          <Link
-            to="/"
-            className="px-4 py-2 rounded-lg text-sm font-medium transition-all hover:opacity-90"
+          {/* + New Capsule */}
+          <button
+            onClick={() => setShowNewCapsule(true)}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all hover:opacity-90 shrink-0"
             style={{ backgroundColor: "var(--color-accent)", color: "#000" }}
           >
-            + New Capsule
+            <Icon name="plus" size={16} />
+            <span>New Capsule</span>
+          </button>
+
+          {/* Notification Bell */}
+          <Link
+            to="/notifications"
+            className="relative p-2 rounded-lg transition-all hover:opacity-80"
+            style={{ color: "var(--color-text-secondary)" }}
+          >
+            <Icon name="bell" size={20} />
+            {unreadCount > 0 && (
+              <span
+                className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-bold"
+                style={{ backgroundColor: "var(--color-danger)", color: "#fff" }}
+              >
+                {unreadCount}
+              </span>
+            )}
           </Link>
 
           {/* Theme toggle */}
@@ -171,23 +224,75 @@ export default function Layout({ children }: { children: ReactNode }) {
             style={{ color: "var(--color-text-secondary)" }}
             title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
           >
-            {theme === "dark" ? "☀" : "☾"}
+            <Icon name={theme === "dark" ? "sun" : "moon"} size={20} />
           </button>
 
-          {/* Avatar */}
-          <div
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold"
-            style={{ backgroundColor: "var(--color-bg-elevated)", color: "var(--color-text-secondary)" }}
-          >
-            {initials}
+          {/* User Avatar/Menu */}
+          <div className="relative">
+            <button
+              onClick={() => setShowProfileMenu(!showProfileMenu)}
+              className="flex items-center gap-2 px-2 py-1 rounded-lg transition-all hover:opacity-80"
+            >
+              <Avatar email={email || undefined} size="sm" />
+              {!collapsed && (
+                <span className="text-xs font-medium hidden sm:block" style={{ color: "var(--color-text-secondary)" }}>
+                  {userName}
+                </span>
+              )}
+            </button>
+
+            {/* Profile dropdown */}
+            {showProfileMenu && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowProfileMenu(false)} />
+                <div
+                  className="absolute right-0 top-full mt-1 w-48 rounded-xl border shadow-xl z-50 overflow-hidden"
+                  style={{
+                    backgroundColor: "var(--color-bg-card)",
+                    borderColor: "var(--color-border)",
+                  }}
+                >
+                  <div className="px-3 py-2 border-b" style={{ borderColor: "var(--color-border)" }}>
+                    <div className="text-xs font-medium" style={{ color: "var(--color-text-primary)" }}>
+                      {userName}
+                    </div>
+                    <div className="text-[10px]" style={{ color: "var(--color-text-muted)" }}>
+                      {email}
+                    </div>
+                  </div>
+                  <Link
+                    to="/profile"
+                    onClick={() => setShowProfileMenu(false)}
+                    className="flex items-center gap-2 px-3 py-2 text-xs transition-all hover:opacity-80"
+                    style={{ color: "var(--color-text-secondary)" }}
+                  >
+                    <Icon name="user" size={14} />
+                    Profile
+                  </Link>
+                  <button
+                    onClick={() => {
+                      setShowProfileMenu(false);
+                      logout();
+                      navigate("/login");
+                    }}
+                    className="flex items-center gap-2 px-3 py-2 text-xs w-full text-left transition-all hover:opacity-80"
+                    style={{ color: "var(--color-text-muted)" }}
+                  >
+                    <Icon name="logout" size={14} />
+                    Logout
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </header>
 
-        {/* Content */}
-        <main className="flex-1 overflow-y-auto">
-          {children}
-        </main>
+        {/* Page Content */}
+        <main className="flex-1 overflow-y-auto">{children}</main>
       </div>
+
+      {/* New Capsule Modal */}
+      <NewCapsuleModal open={showNewCapsule} onClose={() => setShowNewCapsule(false)} />
     </div>
   );
 }

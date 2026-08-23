@@ -11,6 +11,7 @@ import {
   STATUS_COLORS,
 } from "../types";
 import { useAuth } from "../context/AuthContext";
+import Icon from "../components/ui/Icon";
 
 export default function CapsuleDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -234,7 +235,7 @@ export default function CapsuleDetailPage() {
         <div className="rounded-xl p-4 border transition-theme" style={{ backgroundColor: "var(--color-bg-card)", borderColor: "var(--color-border)" }}>
           <div className="flex items-center gap-2 text-xs mb-2" style={{ color: "var(--color-text-secondary)" }}>
             <span className="font-mono px-2 py-0.5 rounded" style={{ backgroundColor: "var(--color-bg-input)", color: "var(--color-text-muted)" }}>
-              📄 {artifact?.filePath}
+              <Icon name="file" size={14} /> {artifact?.filePath}
             </span>
             {anchor.startLine != null && (
               <span className="text-[10px]" style={{ color: "var(--color-text-muted)" }}>
@@ -261,7 +262,7 @@ export default function CapsuleDetailPage() {
           <div className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
             {capsule.reviewer ? (
               <span>
-                👤 Reviewer:{" "}
+                <Icon name="user" size={14} /> Reviewer:{" "}
                 <span className="font-medium" style={{ color: "var(--color-text-primary)" }}>
                   {capsule.reviewer.name || capsule.reviewer.email}
                 </span>
@@ -364,7 +365,7 @@ export default function CapsuleDetailPage() {
                   className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all hover:opacity-80"
                   style={{ borderColor: "var(--color-status-answered)", color: "var(--color-status-answered)", backgroundColor: "rgba(167,139,250,0.1)" }}
                 >
-                  📚 View generated knowledge
+                  <Icon name="eye" size={14} /> View generated knowledge
                 </Link>
                 {/* Publish toggle — only for workspace ADMIN/OWNER */}
                 {membership && (membership.role === "ADMIN" || membership.role === "OWNER") && (
@@ -390,7 +391,7 @@ export default function CapsuleDetailPage() {
                         backgroundColor: knowledgeItem.visibility === "PUBLIC" ? "rgba(34,197,94,0.1)" : "var(--color-bg-input)",
                       }}
                     >
-                      {knowledgeItem.visibility === "PUBLIC" ? "🌍 Published" : "🔒 Private"}
+                      {knowledgeItem.visibility === "PUBLIC" ? "Published" : "Private"}
                     </button>
                     <span className="text-[10px]" style={{ color: "var(--color-text-muted)" }}>
                       {knowledgeItem.visibility === "PUBLIC"
@@ -402,7 +403,7 @@ export default function CapsuleDetailPage() {
               </div>
             ) : knowledgeLoading ? (
               <p className="text-[10px] mt-2" style={{ color: "var(--color-text-muted)" }}>
-                ⏳ Generating knowledge item...
+                Generating knowledge item...
               </p>
             ) : null}
           </div>
@@ -412,7 +413,7 @@ export default function CapsuleDetailPage() {
       {/* Comments */}
       <div className="rounded-xl p-4 border transition-theme" style={{ backgroundColor: "var(--color-bg-card)", borderColor: "var(--color-border)" }}>
         <h2 className="text-sm font-semibold mb-3" style={{ color: "var(--color-text-primary)" }}>
-          💬 Comments ({comments.length})
+          Comments ({comments.length})
         </h2>
 
         {comments.length === 0 ? (

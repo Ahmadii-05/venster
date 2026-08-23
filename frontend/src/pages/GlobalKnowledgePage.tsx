@@ -142,7 +142,7 @@ export default function GlobalKnowledgePage() {
             style={{ backgroundColor: "var(--color-bg-card)", borderColor: "var(--color-border)" }}
           >
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>📖</span>
+              <span className="text-xs" style={{ color: "var(--color-text-muted)" }}></span>
               <h3 className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>{item.title}</h3>
               {item.category && (
                 <span
