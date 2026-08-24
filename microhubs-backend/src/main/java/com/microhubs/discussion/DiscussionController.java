@@ -30,8 +30,9 @@ public class DiscussionController {
     @GetMapping("/api/capsules/{id}/comments")
     public ResponseEntity<ApiResponse<List<Comment>>> listComments(
             @PathVariable UUID id) {
+        String email = currentEmail();
         ApiResponse<List<Comment>> response =
-                discussionService.listComments(id);
+                discussionService.listComments(id, email);
         return ResponseEntity.ok(response);
     }
 

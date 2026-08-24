@@ -30,6 +30,8 @@ public class KnowledgeService {
 
     private static final Logger log = LoggerFactory.getLogger(KnowledgeService.class);
     private static final int MAX_SEARCH_RESULTS = 20;
+    /** How many top-ranked entries are fed to the LLM as grounding for an AI answer. */
+    private static final int ANSWER_CONTEXT_SIZE = 5;
 
     @Autowired
     private KnowledgeRepository knowledgeRepository;
@@ -309,6 +311,176 @@ public class KnowledgeService {
         return ApiResponse.success(results);
     }
 
+    // ── Feature: "My workspaces" scoped search + AI answer ───
+
+    /**
+     * "My workspaces" search: semantic search restricted to knowledge items in
+     * workspaces the caller belongs to. Returns stripped {@link PublicKnowledgeItem}
+     * DTOs so the response serializes safely (no lazy entity graph) once the
+     * read-only transaction closes.
+     */
+    @Transactional(readOnly = true)
+    public ApiResponse<List<PublicKnowledgeItem>> searchMine(
+            String email, String query, String category, String tags) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        List<PublicKnowledgeItem> mapped = retrieveMine(user, query, category, tags)
+                .stream()
+                .map(PublicKnowledgeItem::from)
+                .collect(Collectors.toList());
+        return ApiResponse.success(mapped);
+    }
+
+    /**
+     * Answer a natural-language question using retrieved knowledge as grounding.
+     * Retrieval is scope-aware: {@code "mine"} searches the caller's workspaces;
+     * anything else (the default) searches PUBLIC/global knowledge. The LLM is
+     * told to answer ONLY from the supplied entries and cite them as [1], [2]…
+     *
+     * <p>Degrades gracefully: if nothing matches, or the LLM key is missing / the
+     * call fails, returns {@code hasAnswer=false} with whatever citations were
+     * found so the UI can still show sources (or prompt the user to ask the team).
+     */
+    @Transactional(readOnly = true)
+    public ApiResponse<KnowledgeAnswer> answerQuestion(
+            String email, String query, String scope, String category, String tags) {
+        if (query == null || query.isBlank()) {
+            return ApiResponse.success(new KnowledgeAnswer(false, null, java.util.Collections.emptyList()));
+        }
+
+        List<KnowledgeItem> found;
+        if ("mine".equals(scope)) {
+            User user = userRepository.findByEmail(email)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+            found = retrieveMine(user, query, category, tags);
+        } else {
+            ApiResponse<List<KnowledgeItem>> global = globalSearch(query, category, tags);
+            found = global.getData() != null ? global.getData() : java.util.Collections.emptyList();
+        }
+
+        List<PublicKnowledgeItem> citations = found.stream()
+                .limit(ANSWER_CONTEXT_SIZE)
+                .map(PublicKnowledgeItem::from)
+                .collect(Collectors.toList());
+
+        if (citations.isEmpty()) {
+            return ApiResponse.success(new KnowledgeAnswer(false, null, citations));
+        }
+
+        String context = buildAnswerContext(citations);
+        String answer;
+        try {
+            answer = llmClient.answerQuestion(query, context);
+        } catch (Exception e) {
+            // No key configured, provider down, etc. — still return the sources.
+            log.warn("AI answer generation failed: {}", e.getMessage());
+            return ApiResponse.success(new KnowledgeAnswer(false, null, citations));
+        }
+        if (answer == null || answer.isBlank()) {
+            return ApiResponse.success(new KnowledgeAnswer(false, null, citations));
+        }
+        return ApiResponse.success(new KnowledgeAnswer(true, answer.trim(), citations));
+    }
+
+    /**
+     * Retrieve knowledge items the user can access (any workspace they're a
+     * member of), ranked by embedding similarity. Mirrors {@link #search} minus
+     * the projectId filter. Returns entities; the caller maps them to a DTO.
+     */
+    private List<KnowledgeItem> retrieveMine(User user, String query, String category, String tags) {
+        float[] queryEmbedding;
+        try {
+            queryEmbedding = embeddingClient.embed(query);
+        } catch (Exception e) {
+            log.warn("Embedding failed for query '{}': {}", query, e.getMessage());
+            return java.util.Collections.emptyList();
+        }
+        if (queryEmbedding == null) {
+            return java.util.Collections.emptyList();
+        }
+
+        String embeddingStr = vectorToString(queryEmbedding);
+
+        List<KnowledgeItem> results;
+        try {
+            if (category != null && !category.isBlank()) {
+                results = knowledgeRepository.searchByEmbeddingAndCategory(embeddingStr, category, MAX_SEARCH_RESULTS);
+            } else {
+                results = knowledgeRepository.searchByEmbedding(embeddingStr, MAX_SEARCH_RESULTS);
+            }
+        } catch (Exception e) {
+            log.warn("pgvector search failed: {}. Falling back to keyword search.", e.getMessage());
+            results = knowledgeRepository.findByTitleContainingIgnoreCase(query);
+            if (results == null) results = java.util.Collections.emptyList();
+        }
+
+        // Authorization filter: only items from workspaces the user is a member of.
+        results = results.stream()
+                .filter(item -> {
+                    try {
+                        return hasWorkspaceAccess(item, user);
+                    } catch (Exception e) {
+                        return false;
+                    }
+                })
+                .collect(Collectors.toList());
+
+        return applyTagsFilter(results, tags);
+    }
+
+    /**
+     * Filter items whose tags contain any of the (comma-separated) filter terms.
+     * Case-insensitive substring match. A blank filter is a no-op.
+     */
+    private List<KnowledgeItem> applyTagsFilter(List<KnowledgeItem> items, String tags) {
+        if (tags == null || tags.isBlank()) {
+            return items;
+        }
+        String[] tagFilters = tags.split(",");
+        return items.stream()
+                .filter(item -> {
+                    if (item.getTags() == null) return false;
+                    for (String tf : tagFilters) {
+                        String t = tf.trim().toLowerCase();
+                        if (t.isEmpty()) continue;
+                        for (String tag : item.getTags()) {
+                            if (tag.toLowerCase().contains(t)) return true;
+                        }
+                    }
+                    return false;
+                })
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Build a numbered, secret-redacted context block from the top knowledge
+     * entries. The [n] numbers match the citations the LLM is told to use.
+     */
+    private String buildAnswerContext(List<PublicKnowledgeItem> items) {
+        StringBuilder sb = new StringBuilder();
+        int i = 1;
+        for (PublicKnowledgeItem it : items) {
+            sb.append("[").append(i++).append("] ").append(nullSafe(it.title())).append("\n");
+            sb.append("Summary: ").append(nullSafe(it.summary())).append("\n");
+            if (it.rootCause() != null && !it.rootCause().isBlank()) {
+                sb.append("Root cause: ").append(it.rootCause()).append("\n");
+            }
+            if (it.solution() != null && !it.solution().isBlank()) {
+                sb.append("Solution: ").append(it.solution()).append("\n");
+            }
+            if (it.category() != null && !it.category().isBlank()) {
+                sb.append("Category: ").append(it.category()).append("\n");
+            }
+            sb.append("\n");
+        }
+        // Belt-and-braces: entries are already generated (not raw code), but redact anyway.
+        return SecretRedactor.redact(sb.toString());
+    }
+
+    private static String nullSafe(String s) {
+        return s == null ? "" : s;
+    }
+
     // ── Feature A: Visibility + Global Search ────────────────
 
     /**
@@ -423,6 +595,32 @@ public class KnowledgeService {
         }
 
         return ApiResponse.success(results);
+    }
+
+    /**
+     * Browse global knowledge without a query: the most-recent PUBLIC items,
+     * optionally narrowed by category/tags. Powers the Global Community landing
+     * view so users see solved problems immediately, before typing a search.
+     * No embedding is computed — results are ordered by recency.
+     */
+    @Transactional(readOnly = true)
+    public ApiResponse<List<PublicKnowledgeItem>> browseGlobalRecent(String category, String tags) {
+        List<KnowledgeItem> results =
+                knowledgeRepository.findTop50ByVisibilityOrderByCreatedAtDesc(KnowledgeVisibility.PUBLIC);
+
+        if (category != null && !category.isBlank() && !"ALL".equalsIgnoreCase(category)) {
+            final String cat = category;
+            results = results.stream()
+                    .filter(item -> cat.equalsIgnoreCase(item.getCategory()))
+                    .collect(Collectors.toList());
+        }
+
+        results = applyTagsFilter(results, tags);
+
+        List<PublicKnowledgeItem> mapped = results.stream()
+                .map(PublicKnowledgeItem::from)
+                .collect(Collectors.toList());
+        return ApiResponse.success(mapped);
     }
 
     /**

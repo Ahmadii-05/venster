@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import Logo from "../components/ui/Logo";
 
 export default function RegisterPage() {
   const [name, setName] = useState("");
@@ -24,6 +25,9 @@ export default function RegisterPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="w-full max-w-md bg-white rounded-xl shadow-lg p-8">
+        <div className="flex justify-center mb-4">
+          <Logo size={48} style={{ color: "#14B8A6" }} />
+        </div>
         <h1 className="text-2xl font-bold text-center mb-6">
           Create an Account
         </h1>

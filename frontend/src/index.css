@@ -2,12 +2,14 @@
 
 /* ── Theme Custom Properties ─────────────────────────────────── */
 @theme {
-  --color-bg-primary: #0B0D12;
+  --color-bg-primary: #0A0C10;
   --color-bg-card: #12151C;
-  --color-bg-elevated: #151922;
+  --color-bg-elevated: #161B24;
+  --color-bg-inset: #0E1116;
   --color-bg-input: #1A1F2B;
   --color-border: #1F2430;
-  --color-border-hover: #2A3040;
+  --color-border-hover: #2A313F;
+  --color-gutter: #3A4150;
 
   --color-text-primary: #E6EDF3;
   --color-text-secondary: #8B949E;
@@ -36,12 +38,14 @@
 
 /* ── Light theme overrides ──────────────────────────────────── */
 .light {
-  --color-bg-primary: #F8FAFC;
+  --color-bg-primary: #F4F6F8;
   --color-bg-card: #FFFFFF;
-  --color-bg-elevated: #F1F5F9;
+  --color-bg-elevated: #FBFCFD;
+  --color-bg-inset: #EEF1F4;
   --color-bg-input: #F1F5F9;
-  --color-border: #E2E8F0;
+  --color-border: #E3E7EB;
   --color-border-hover: #CBD5E1;
+  --color-gutter: #B4BCC6;
 
   --color-text-primary: #0F172A;
   --color-text-secondary: #475569;
@@ -64,27 +68,56 @@
   --color-priority-low: #9CA3AF;
 }
 
+/* ── Font roles (plain custom props so Tailwind doesn't generate
+   conflicting font utilities): Space Grotesk = display,
+   Inter = body, JetBrains Mono = data/structure ─────────────── */
+:root {
+  --font-display: "Space Grotesk", "Inter", system-ui, sans-serif;
+  --font-body: "Inter", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", "Fira Code", "Cascadia Code", ui-monospace, monospace;
+}
+
 /* ── Base styles ────────────────────────────────────────────── */
 body {
   background-color: var(--color-bg-primary);
   color: var(--color-text-primary);
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: var(--font-body);
+  letter-spacing: 0.005em;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Display face for headings + big numbers (the one bold type move) */
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
+}
+
+/* Mono "eyebrow" / kicker used above section + page headers */
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--color-accent);
 }
 
 /* ── Scrollbar styling ──────────────────────────────────────── */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--color-border);
-  border-radius: 3px;
+  background: var(--color-border-hover);
+  border-radius: 4px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--color-border-hover);
+  background: var(--color-text-muted);
 }
 
 /* ── Transition utilities ───────────────────────────────────── */
@@ -94,5 +127,46 @@ body {
 
 /* ── Monospace utility ──────────────────────────────────────── */
 .font-mono {
-  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', ui-monospace, monospace;
+  font-family: var(--font-mono);
+}
+
+/* ── The signature: IDE-gutter knowledge card ───────────────── */
+.gutter-card {
+  display: grid;
+  grid-template-columns: 46px 1fr;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  background-color: var(--color-bg-card);
+  transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+}
+.gutter-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--color-border-hover);
+  box-shadow: 0 20px 48px -24px rgba(0, 0, 0, 0.5);
+}
+.gutter-rail {
+  position: relative;
+  background-color: var(--color-bg-inset);
+  border-right: 1px solid var(--color-border);
+}
+
+/* Pulsing "current" dot on the lifecycle track */
+@keyframes venster-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+.lifecycle-pulse {
+  animation: venster-pulse 1.8s ease-in-out infinite;
+}
+
+/* Respect reduced-motion across the app */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }

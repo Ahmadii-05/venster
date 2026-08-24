@@ -3,6 +3,8 @@ import type {
   Workspace,
   WorkspaceMember,
   Project,
+  ProjectStatus,
+  ProjectPriority,
   Artifact,
   ArtifactVersion,
   ArtifactAnchor,
@@ -13,40 +15,38 @@ import type {
   Resolution,
   Notification,
   KnowledgeItem,
+  KnowledgeAnswer,
   GlobalQuestion,
   GlobalAnswer,
+  UserSummary,
 } from "../types";
 
 // ── Base URL from env ─────────────────────────────────────────
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8082";
 
-// ── Auth state persisted in localStorage ──────────────────────
+// ── Auth state ────────────────────────────────────────────────
+// SECURITY NOTE: the JWT is persisted in localStorage, which is readable by
+// any script on the page and therefore exfiltratable via XSS. The hardened
+// long-term fix is for the backend to issue the token in an httpOnly, Secure,
+// SameSite cookie so it is never exposed to JS — a coordinated backend+frontend
+// change tracked as a follow-up. Until then we keep the persisted surface
+// minimal (token only; the email lives in React state, not storage).
 let _token: string | null = localStorage.getItem("token");
-let _user: { email: string } | null = (() => {
-  const raw = localStorage.getItem("user");
-  return raw ? JSON.parse(raw) : null;
-})();
 
 export function getStoredToken(): string | null {
   return _token;
 }
 
-export function setAuthToken(token: string, email: string) {
+export function setAuthToken(token: string) {
   _token = token;
-  _user = { email };
   localStorage.setItem("token", token);
-  localStorage.setItem("user", JSON.stringify({ email }));
 }
 
 export function clearAuthToken() {
   _token = null;
-  _user = null;
   localStorage.removeItem("token");
+  // Clean up the legacy "user" entry older builds used to persist.
   localStorage.removeItem("user");
-}
-
-export function getStoredUser(): { email: string } | null {
-  return _user;
 }
 
 // ── Core fetch wrapper ────────────────────────────────────────
@@ -74,7 +74,27 @@ async function request<T>(
     throw new Error("Unauthorized");
   }
 
-  const body = await res.json();
+  // Read the body as text first so an empty response (e.g. 204 No Content)
+  // or a non-JSON error page doesn't blow up with an opaque parse error.
+  const raw = await res.text();
+
+  if (!raw) {
+    if (!res.ok) {
+      const err = new Error(`Request failed (HTTP ${res.status})`);
+      (err as any).status = res.status;
+      throw err;
+    }
+    return undefined as T;
+  }
+
+  let body: any;
+  try {
+    body = JSON.parse(raw);
+  } catch {
+    const err = new Error(`Unexpected non-JSON response (HTTP ${res.status})`);
+    (err as any).status = res.status;
+    throw err;
+  }
 
   if (!body.success) {
     const err = new Error(body.error || "Request failed");
@@ -110,6 +130,14 @@ export const authApi = {
     }),
 };
 
+// ── Users (directory search) ──────────────────────────────────
+export const userApi = {
+  // Search registered users by name or email. Powers the "add member"
+  // typeahead; returns [] for a blank query.
+  search: (query: string) =>
+    request<UserSummary[]>(`/api/users?search=${encodeURIComponent(query)}`),
+};
+
 // ── Workspace ─────────────────────────────────────────────────
 export const workspaceApi = {
   list: () => request<Workspace[]>("/api/workspaces"),
@@ -123,18 +151,36 @@ export const workspaceApi = {
       method: "POST",
       body: JSON.stringify({ email, role }),
     }),
+  listMembers: (workspaceId: string) =>
+    request<WorkspaceMember[]>(`/api/workspaces/${workspaceId}/members`),
   getMember: (workspaceId: string, email: string) =>
     request<WorkspaceMember>(`/api/workspaces/${workspaceId}/members/${email}`),
 };
 
 // ── Project ───────────────────────────────────────────────────
+export interface ProjectInput {
+  name: string;
+  description?: string;
+  repositoryUrl?: string;
+  techStack?: string;
+  status?: ProjectStatus;
+  priority?: ProjectPriority;
+  targetDate?: string; // ISO date (yyyy-MM-dd)
+}
+
 export const projectApi = {
   list: (workspaceId: string) =>
     request<Project[]>(`/api/projects?workspaceId=${workspaceId}`),
-  create: (workspaceId: string, name: string, description?: string) =>
+  get: (projectId: string) => request<Project>(`/api/projects/${projectId}`),
+  create: (workspaceId: string, input: ProjectInput) =>
     request<Project>(`/api/projects?workspaceId=${workspaceId}`, {
       method: "POST",
-      body: JSON.stringify({ name, description }),
+      body: JSON.stringify(input),
+    }),
+  update: (projectId: string, input: ProjectInput) =>
+    request<Project>(`/api/projects/${projectId}`, {
+      method: "PATCH",
+      body: JSON.stringify(input),
     }),
 };
 
@@ -251,6 +297,27 @@ export const knowledgeApi = {
     if (params.tags) q.set("tags", params.tags);
     return request<KnowledgeItem[]>(`/api/knowledge/search?${q.toString()}`);
   },
+  // Browse recent PUBLIC items with NO query — powers the Global Community
+  // landing view so solved problems are visible before the user searches.
+  browseGlobal: (params?: { category?: string; tags?: string }) => {
+    const q = new URLSearchParams();
+    if (params?.category && params.category !== "ALL") q.set("category", params.category);
+    if (params?.tags) q.set("tags", params.tags);
+    const qs = q.toString();
+    return request<KnowledgeItem[]>(`/api/knowledge/global/recent${qs ? "?" + qs : ""}`);
+  },
+  // AI answer with citations. scope "mine" searches the caller's workspaces;
+  // anything else (default) searches PUBLIC/global knowledge.
+  answer: (params: {
+    q: string;
+    scope?: string;
+    category?: string;
+    tags?: string;
+  }) =>
+    request<KnowledgeAnswer>("/api/knowledge/answer", {
+      method: "POST",
+      body: JSON.stringify(params),
+    }),
 };
 
 // ── Global Q&A ───────────────────────────────────────────────

@@ -55,6 +55,73 @@ public class ProjectService {
         project.setDescription(request.getDescription());
         project.setWorkspace(workspace);
 
+        // Optional technical metadata. Guard the enums so a missing value keeps
+        // the entity default (PLANNING / MEDIUM) instead of overwriting it null.
+        project.setRepositoryUrl(request.getRepositoryUrl());
+        project.setTechStack(request.getTechStack());
+        if (request.getStatus() != null) {
+            project.setStatus(request.getStatus());
+        }
+        if (request.getPriority() != null) {
+            project.setPriority(request.getPriority());
+        }
+        project.setTargetDate(request.getTargetDate());
+
+        Project savedProject = projectRepository.save(project);
+
+        return ApiResponse.success(savedProject);
+    }
+
+    /**
+     * Get a single project by ID.
+     *
+     * Business rule:
+     * Only workspace members can view it.
+     */
+    @Transactional(readOnly = true)
+    public ApiResponse<Project> getProject(UUID projectId, String email) {
+
+        User user = getUser(email);
+
+        Project project = getProjectById(projectId);
+
+        verifyWorkspaceMembership(project.getWorkspace(), user);
+
+        return ApiResponse.success(project);
+    }
+
+    /**
+     * Update a project's name, description, and technical metadata.
+     *
+     * Business rule:
+     * Only members of the owning workspace can edit a project.
+     * The enum fields are only overwritten when supplied, so a partial
+     * update can't accidentally blank out status or priority.
+     */
+    public ApiResponse<Project> updateProject(
+            UUID projectId,
+            String email,
+            ProjectRequest request) {
+
+        User user = getUser(email);
+
+        Project project = getProjectById(projectId);
+
+        // Authorization check
+        verifyWorkspaceMembership(project.getWorkspace(), user);
+
+        project.setName(request.getName());
+        project.setDescription(request.getDescription());
+        project.setRepositoryUrl(request.getRepositoryUrl());
+        project.setTechStack(request.getTechStack());
+        if (request.getStatus() != null) {
+            project.setStatus(request.getStatus());
+        }
+        if (request.getPriority() != null) {
+            project.setPriority(request.getPriority());
+        }
+        project.setTargetDate(request.getTargetDate());
+
         Project savedProject = projectRepository.save(project);
 
         return ApiResponse.success(savedProject);
@@ -102,6 +169,16 @@ public class ProjectService {
         return workspaceRepository.findById(workspaceId)
                 .orElseThrow(() ->
                         new RuntimeException("Workspace not found"));
+    }
+
+    /**
+     * Find a project by ID.
+     */
+    private Project getProjectById(UUID projectId) {
+
+        return projectRepository.findById(projectId)
+                .orElseThrow(() ->
+                        new RuntimeException("Project not found"));
     }
 
     /**

@@ -82,9 +82,13 @@ public class DiscussionService {
      * List comments for a capsule, ordered by creation time.
      */
     @Transactional(readOnly = true)
-    public ApiResponse<List<Comment>> listComments(UUID capsuleId) {
+    public ApiResponse<List<Comment>> listComments(UUID capsuleId, String email) {
+        User user = getUser(email);
         Capsule capsule = capsuleRepository.findById(capsuleId)
                 .orElseThrow(() -> new RuntimeException("Capsule not found"));
+
+        // Only workspace members may read a capsule's comments
+        verifyWorkspaceMembership(capsule, user);
 
         List<Comment> comments = commentRepository
                 .findByCapsuleOrderByCreatedAtAsc(capsule);

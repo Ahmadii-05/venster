@@ -29,8 +29,9 @@ public class ResolutionController {
     @GetMapping("/api/capsules/{id}/resolution")
     public ResponseEntity<ApiResponse<Resolution>> getResolution(
             @PathVariable UUID id) {
+        String email = currentEmail();
         ApiResponse<Resolution> response =
-                resolutionService.getResolution(id);
+                resolutionService.getResolution(id, email);
         return ResponseEntity.ok(response);
     }
 

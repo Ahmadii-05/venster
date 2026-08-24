@@ -5,6 +5,7 @@ import {
   type Capsule,
   type Comment,
   type CapsuleStatus,
+  type CapsulePriority,
   type WorkspaceMember,
   type KnowledgeItem,
   ALLOWED_TRANSITIONS,
@@ -25,12 +26,23 @@ export default function CapsuleDetailPage() {
   const [resolveSolution, setResolveSolution] = useState("");
   const [resolving, setResolving] = useState(false);
   const [showResolve, setShowResolve] = useState(false);
-  const [assigneeEmail, setAssigneeEmail] = useState("");
+  const [assigneeQuery, setAssigneeQuery] = useState("");
   const [assigning, setAssigning] = useState(false);
+  const [members, setMembers] = useState<WorkspaceMember[]>([]);
+  const [showAssignDropdown, setShowAssignDropdown] = useState(false);
   const [resolution, setResolution] = useState<any>(null);
   const [membership, setMembership] = useState<WorkspaceMember | null>(null);
   const [knowledgeItem, setKnowledgeItem] = useState<KnowledgeItem | null>(null);
   const [knowledgeLoading, setKnowledgeLoading] = useState(false);
+
+  // ── Capsule edit-form state (title / priority / status) ────
+  const [showEditCapsule, setShowEditCapsule] = useState(false);
+  const [savingCapsule, setSavingCapsule] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editCapPriority, setEditCapPriority] = useState<
+    "LOW" | "MEDIUM" | "HIGH"
+  >("MEDIUM");
+  const [editCapStatus, setEditCapStatus] = useState<CapsuleStatus>("OPEN");
 
   const fetchAll = useCallback(async () => {
     if (!id) return;
@@ -78,6 +90,14 @@ export default function CapsuleDetailPage() {
         } catch {
           // Not a member — membership will remain null
         }
+        try {
+          // Roster powers the reviewer-assignment dropdown, so we can send a
+          // real user id instead of a free-typed email the backend can't resolve.
+          const roster = await workspaceApi.listMembers(workspaceId);
+          setMembers(roster || []);
+        } catch {
+          // Couldn't load the roster — the dropdown will simply be empty.
+        }
       }
     } catch (err: any) {
       setError(err.message);
@@ -104,6 +124,45 @@ export default function CapsuleDetailPage() {
       setError("");
     } catch (err: any) {
       setError(err.message);
+    }
+  };
+
+  // Pre-fill the capsule edit form from the loaded capsule and open it.
+  const openEditCapsule = () => {
+    if (capsule) {
+      setEditTitle(capsule.title);
+      // Backend only allows LOW/MEDIUM/HIGH; coerce any legacy CRITICAL to HIGH.
+      setEditCapPriority(capsule.priority === "CRITICAL" ? "HIGH" : capsule.priority);
+      setEditCapStatus(capsule.status);
+    }
+    setShowEditCapsule(true);
+  };
+
+  const handleUpdateCapsule = async () => {
+    if (!id || !editTitle.trim()) return;
+    setSavingCapsule(true);
+    setError("");
+    try {
+      const patch: {
+        title?: string;
+        priority?: CapsulePriority;
+        status?: CapsuleStatus;
+      } = {
+        title: editTitle.trim(),
+        priority: editCapPriority,
+      };
+      // Only send status when it actually changes, so we never trip the
+      // backend's transition guard with a redundant same-status write.
+      if (capsule && editCapStatus !== capsule.status) {
+        patch.status = editCapStatus;
+      }
+      const updated = await capsuleApi.update(id, patch);
+      setCapsule(updated);
+      setShowEditCapsule(false);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setSavingCapsule(false);
     }
   };
 
@@ -140,20 +199,52 @@ export default function CapsuleDetailPage() {
     }
   };
 
-  const handleAssignReviewer = async () => {
-    if (!id || !assigneeEmail.trim()) return;
+  // Members matching the typed text (by name or email), for the dropdown.
+  const filteredMembers = (() => {
+    const q = assigneeQuery.trim().toLowerCase();
+    if (!q) return members;
+    return members.filter(
+      (m) =>
+        (m.user.name || "").toLowerCase().includes(q) ||
+        m.user.email.toLowerCase().includes(q)
+    );
+  })();
+
+  // Assign a specific member as reviewer (sends the user's UUID, not an email).
+  const assignReviewer = async (member: WorkspaceMember) => {
+    if (!id) return;
     setAssigning(true);
+    setShowAssignDropdown(false);
     try {
       const updated = await capsuleApi.update(id, {
-        reviewerId: assigneeEmail,
+        reviewerId: member.user.id,
       });
       setCapsule(updated);
-      setAssigneeEmail("");
+      setAssigneeQuery("");
+      setError("");
     } catch (err: any) {
       setError(err.message);
     } finally {
       setAssigning(false);
     }
+  };
+
+  // Resolve whatever is typed to a real member, else surface "No such user found".
+  const handleAssignReviewer = async () => {
+    const q = assigneeQuery.trim().toLowerCase();
+    if (!q) return;
+    const exact = members.find(
+      (m) =>
+        (m.user.name || "").toLowerCase() === q ||
+        m.user.email.toLowerCase() === q
+    );
+    const target =
+      exact || (filteredMembers.length === 1 ? filteredMembers[0] : null);
+    if (!target) {
+      setError("No such user found");
+      return;
+    }
+    await assignReviewer(target);
   };
 
   const validTransitions = capsule
@@ -214,6 +305,17 @@ export default function CapsuleDetailPage() {
           >
             {capsule.priority}
           </span>
+          <button
+            onClick={openEditCapsule}
+            className="px-3 py-1 rounded-lg text-xs font-medium border transition-all hover:opacity-90"
+            style={{
+              backgroundColor: "var(--color-bg-input)",
+              borderColor: "var(--color-border)",
+              color: "var(--color-text-secondary)",
+            }}
+          >
+            ✎ Edit
+          </button>
         </div>
       </div>
 
@@ -227,6 +329,131 @@ export default function CapsuleDetailPage() {
           >
             dismiss
           </button>
+        </div>
+      )}
+
+      {/* ── Capsule edit form (title / priority / status) ──── */}
+      {showEditCapsule && (
+        <div
+          className="rounded-xl p-4 border transition-theme space-y-3"
+          style={{
+            backgroundColor: "var(--color-bg-card)",
+            borderColor: "var(--color-border)",
+          }}
+        >
+          <div
+            className="text-xs uppercase tracking-widest font-mono"
+            style={{ color: "var(--color-accent)" }}
+          >
+            EDIT CAPSULE
+          </div>
+
+          <div>
+            <label
+              className="text-[10px] font-mono uppercase tracking-wider mb-1 block"
+              style={{ color: "var(--color-text-muted)" }}
+            >
+              Title *
+            </label>
+            <input
+              type="text"
+              value={editTitle}
+              onChange={(e) => setEditTitle(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg text-sm border outline-none focus:ring-1 transition-theme"
+              style={{
+                backgroundColor: "var(--color-bg-input)",
+                borderColor: "var(--color-border)",
+                color: "var(--color-text-primary)",
+              }}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label
+                className="text-[10px] font-mono uppercase tracking-wider mb-1 block"
+                style={{ color: "var(--color-text-muted)" }}
+              >
+                Priority
+              </label>
+              <select
+                value={editCapPriority}
+                onChange={(e) =>
+                  setEditCapPriority(e.target.value as "LOW" | "MEDIUM" | "HIGH")
+                }
+                className="w-full px-3 py-2 rounded-lg text-sm border outline-none transition-theme"
+                style={{
+                  backgroundColor: "var(--color-bg-input)",
+                  borderColor: "var(--color-border)",
+                  color: "var(--color-text-primary)",
+                }}
+              >
+                <option value="LOW">Low</option>
+                <option value="MEDIUM">Medium</option>
+                <option value="HIGH">High</option>
+              </select>
+            </div>
+            <div>
+              <label
+                className="text-[10px] font-mono uppercase tracking-wider mb-1 block"
+                style={{ color: "var(--color-text-muted)" }}
+              >
+                Status
+              </label>
+              <select
+                value={editCapStatus}
+                onChange={(e) =>
+                  setEditCapStatus(e.target.value as CapsuleStatus)
+                }
+                disabled={validTransitions.length === 0}
+                className="w-full px-3 py-2 rounded-lg text-sm border outline-none transition-theme disabled:opacity-60"
+                style={{
+                  backgroundColor: "var(--color-bg-input)",
+                  borderColor: "var(--color-border)",
+                  color: "var(--color-text-primary)",
+                }}
+              >
+                {/* Current status (no-op) plus only the valid next transitions. */}
+                {[capsule.status, ...validTransitions].map((s) => (
+                  <option key={s} value={s}>
+                    {s.replace("_", " ")}
+                    {s === capsule.status ? " (current)" : ""}
+                  </option>
+                ))}
+              </select>
+              {validTransitions.length === 0 && (
+                <p
+                  className="text-[10px] mt-1"
+                  style={{ color: "var(--color-text-muted)" }}
+                >
+                  This status is terminal — no further transitions.
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="flex gap-2 pt-1">
+            <button
+              onClick={handleUpdateCapsule}
+              disabled={!editTitle.trim() || savingCapsule}
+              className="px-4 py-2 rounded-lg text-sm font-medium transition-all hover:opacity-90 disabled:opacity-50"
+              style={{ backgroundColor: "var(--color-accent)", color: "#000" }}
+            >
+              {savingCapsule ? "Saving..." : "Save changes"}
+            </button>
+            <button
+              onClick={() => setShowEditCapsule(false)}
+              disabled={savingCapsule}
+              className="px-4 py-2 rounded-lg text-sm font-medium border transition-all hover:opacity-90 disabled:opacity-50"
+              style={{
+                backgroundColor: "var(--color-bg-input)",
+                borderColor: "var(--color-border)",
+                color: "var(--color-text-secondary)",
+              }}
+            >
+              Cancel
+            </button>
+          </div>
         </div>
       )}
 
@@ -289,23 +516,67 @@ export default function CapsuleDetailPage() {
               </div>
             )}
 
-            {/* Assign reviewer */}
-            <div className="flex gap-1">
-              <input
-                type="text"
-                placeholder="Assign reviewer (email)"
-                value={assigneeEmail}
-                onChange={(e) => setAssigneeEmail(e.target.value)}
-                className="rounded-lg px-2 py-1 text-xs border outline-none focus:ring-1 transition-theme w-40"
-                style={{ backgroundColor: "var(--color-bg-input)", borderColor: "var(--color-border)", color: "var(--color-text-primary)" }}
-              />
+            {/* Assign reviewer — searchable workspace-member dropdown */}
+            <div className="flex gap-1 items-start">
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Assign reviewer (name)"
+                  value={assigneeQuery}
+                  onChange={(e) => {
+                    setAssigneeQuery(e.target.value);
+                    setShowAssignDropdown(true);
+                  }}
+                  onFocus={() => setShowAssignDropdown(true)}
+                  onBlur={() => setTimeout(() => setShowAssignDropdown(false), 150)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleAssignReviewer();
+                  }}
+                  className="rounded-lg px-2 py-1 text-xs border outline-none focus:ring-1 transition-theme w-44"
+                  style={{ backgroundColor: "var(--color-bg-input)", borderColor: "var(--color-border)", color: "var(--color-text-primary)" }}
+                />
+                {showAssignDropdown && (members.length > 0 || assigneeQuery.trim()) && (
+                  <div
+                    className="absolute z-10 mt-1 w-56 max-h-48 overflow-y-auto rounded-lg border shadow-lg"
+                    style={{ backgroundColor: "var(--color-bg-card)", borderColor: "var(--color-border)" }}
+                  >
+                    {filteredMembers.length > 0 ? (
+                      filteredMembers.map((m) => (
+                        <button
+                          key={m.id}
+                          type="button"
+                          // onMouseDown fires before the input's onBlur, so the
+                          // selection registers before the dropdown closes.
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            assignReviewer(m);
+                          }}
+                          className="w-full text-left px-3 py-1.5 text-xs transition-all hover:opacity-70"
+                          style={{ color: "var(--color-text-primary)" }}
+                        >
+                          <span className="font-medium">{m.user.name || m.user.email}</span>
+                          {m.user.name && (
+                            <span className="ml-1 text-[10px]" style={{ color: "var(--color-text-muted)" }}>
+                              {m.user.email}
+                            </span>
+                          )}
+                        </button>
+                      ))
+                    ) : (
+                      <div className="px-3 py-1.5 text-xs" style={{ color: "var(--color-text-muted)" }}>
+                        No such user found
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
               <button
                 onClick={handleAssignReviewer}
-                disabled={!assigneeEmail || assigning}
+                disabled={!assigneeQuery.trim() || assigning}
                 className="px-2 py-1 rounded-lg text-xs font-medium border transition-all hover:opacity-80 disabled:opacity-50"
                 style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)", backgroundColor: "var(--color-bg-input)" }}
               >
-                Assign
+                {assigning ? "..." : "Assign"}
               </button>
             </div>
 
@@ -375,7 +646,7 @@ export default function CapsuleDetailPage() {
                         if (!knowledgeItem) return;
                         const newVis = knowledgeItem.visibility === "PUBLIC" ? "PRIVATE" : "PUBLIC";
                         if (newVis === "PUBLIC" && !window.confirm(
-                          "Publish to Global Knowledge Base?\n\nThis makes the summary (not the code or discussion) visible to all users of the platform."
+                          "Publish to the Global Community?\n\nThis makes the summary (not the code or discussion) visible to all users of the platform."
                         )) return;
                         try {
                           const updated = await knowledgeApi.setVisibility(knowledgeItem.id, newVis);

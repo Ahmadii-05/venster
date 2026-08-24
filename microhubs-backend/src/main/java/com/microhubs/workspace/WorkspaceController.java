@@ -73,6 +73,25 @@ public class WorkspaceController {
     }
 
     /**
+     * List all members of a workspace.
+     *
+     * Only members can view the roster. Powers the reviewer-assignment
+     * dropdown on the frontend.
+     */
+    @GetMapping("/{id}/members")
+    public ApiResponse<List<WorkspaceMember>> listMembers(
+            @PathVariable UUID id,
+            Authentication authentication) {
+
+        String requesterEmail = authentication.getName();
+
+        List<WorkspaceMember> members =
+                workspaceService.listMembers(id, requesterEmail);
+
+        return ApiResponse.success(members);
+    }
+
+    /**
      * Add a member.
      *
      * Only OWNER/ADMIN can perform this operation.

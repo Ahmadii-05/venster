@@ -4,15 +4,20 @@ import Icon from "../components/ui/Icon";
 import type { GlobalQuestion, GlobalAnswer } from "../types";
 import { useAuth } from "../context/AuthContext";
 
+const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
+  OPEN: { bg: "rgba(56, 189, 248, 0.15)", text: "var(--color-status-open)" },
+  ANSWERED: { bg: "rgba(34, 197, 94, 0.15)", text: "var(--color-status-resolved)" },
+  CLOSED: { bg: "rgba(107, 114, 128, 0.15)", text: "var(--color-status-archived)" },
+};
+
+function statusColor(status: string): string {
+  return (STATUS_COLORS[status] || STATUS_COLORS.OPEN).text;
+}
+
 function StatusBadge({ status }: { status: string }) {
-  const colors: Record<string, { bg: string; text: string }> = {
-    OPEN: { bg: "rgba(56, 189, 248, 0.15)", text: "var(--color-status-open)" },
-    ANSWERED: { bg: "rgba(34, 197, 94, 0.15)", text: "var(--color-status-resolved)" },
-    CLOSED: { bg: "rgba(107, 114, 128, 0.15)", text: "var(--color-status-archived)" },
-  };
-  const c = colors[status] || colors.OPEN;
+  const c = STATUS_COLORS[status] || STATUS_COLORS.OPEN;
   return (
-    <span className="px-2 py-0.5 rounded-full text-xs font-medium" style={{ backgroundColor: c.bg, color: c.text }}>
+    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold uppercase tracking-wider" style={{ backgroundColor: c.bg, color: c.text }}>
       {status}
     </span>
   );
@@ -56,11 +61,9 @@ export default function GlobalQAPage() {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <div className="text-[10px] uppercase tracking-widest font-mono mb-1" style={{ color: "var(--color-accent)" }}>
-            COMMUNITY
-          </div>
-          <h1 className="text-2xl font-bold" style={{ color: "var(--color-text-primary)" }}>
-            Community Q&A
+          <div className="eyebrow mb-1.5">Community</div>
+          <h1 className="font-display text-2xl font-bold" style={{ color: "var(--color-text-primary)" }}>
+            Community Q&amp;A
           </h1>
           <p className="text-sm mt-1" style={{ color: "var(--color-text-secondary)" }}>
             Ask questions, share knowledge — no workspace required.
@@ -68,7 +71,7 @@ export default function GlobalQAPage() {
         </div>
         <button
           onClick={() => setShowAsk(true)}
-          className="px-4 py-2 rounded-lg text-sm font-medium border transition-all hover:opacity-90"
+          className="px-4 py-2 rounded-lg text-sm font-semibold font-display border transition-all hover:opacity-90"
           style={{ backgroundColor: "var(--color-accent)", borderColor: "var(--color-accent)", color: "#000" }}
         >
           Ask a Question
@@ -99,18 +102,23 @@ export default function GlobalQAPage() {
             <button
               key={q.id}
               onClick={() => setSelectedQuestion(q)}
-              className="w-full text-left rounded-xl p-4 border transition-all hover:opacity-90"
+              className="relative overflow-hidden w-full text-left rounded-xl p-4 pl-5 border transition-all hover:-translate-y-0.5 hover:shadow-lg group"
               style={{ backgroundColor: "var(--color-bg-card)", borderColor: "var(--color-border)" }}
             >
+              <span
+                className="absolute left-0 top-0 bottom-0 w-[3px]"
+                style={{ backgroundColor: statusColor(q.status) }}
+                aria-hidden="true"
+              />
               <div className="flex items-center gap-2 mb-1">
-                <h3 className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>{q.title}</h3>
+                <h3 className="text-sm font-semibold font-display group-hover:text-[var(--color-accent)] transition-colors" style={{ color: "var(--color-text-primary)" }}>{q.title}</h3>
                 <StatusBadge status={q.status} />
                 {q.reportCount > 0 && (
-                  <span className="text-xs" style={{ color: "var(--color-warning)" }}><Icon name="alert" size={12} /> {q.reportCount} reports</span>
+                  <span className="inline-flex items-center gap-1 text-xs font-mono" style={{ color: "var(--color-warning)" }}><Icon name="alert" size={12} /> {q.reportCount} reports</span>
                 )}
               </div>
-              <p className="text-xs line-clamp-2 mt-1" style={{ color: "var(--color-text-secondary)" }}>{q.body}</p>
-              <div className="flex items-center gap-3 mt-2 text-[10px]" style={{ color: "var(--color-text-muted)" }}>
+              <p className="text-xs line-clamp-2 mt-1 leading-relaxed" style={{ color: "var(--color-text-secondary)" }}>{q.body}</p>
+              <div className="flex items-center gap-3 mt-2 text-[10px] font-mono" style={{ color: "var(--color-text-muted)" }}>
                 <span>by {q.author?.name || "Unknown"}</span>
                 <span>{new Date(q.createdAt).toLocaleDateString()}</span>
                 {q.tags && q.tags.length > 0 && (
@@ -151,13 +159,13 @@ function AskQuestionForm({ onSubmitted, onCancel }: { onSubmitted: () => void; o
 
   return (
     <div className="rounded-xl p-6 border transition-theme space-y-3" style={{ backgroundColor: "var(--color-bg-card)", borderColor: "var(--color-border)" }}>
-      <h2 className="text-lg font-semibold" style={{ color: "var(--color-text-primary)" }}>Ask a Question</h2>
+      <h2 className="text-lg font-semibold font-display" style={{ color: "var(--color-text-primary)" }}>Ask a Question</h2>
       <input
         type="text"
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         placeholder="Question title"
-        className="w-full rounded-lg px-3 py-2 text-sm border outline-none focus:ring-1 transition-theme"
+        className="w-full rounded-lg px-3 py-2 text-sm border outline-none focus:ring-1 focus:ring-[color:var(--color-accent)] transition-theme"
         style={{ backgroundColor: "var(--color-bg-input)", borderColor: "var(--color-border)", color: "var(--color-text-primary)" }}
       />
       <textarea
@@ -165,7 +173,7 @@ function AskQuestionForm({ onSubmitted, onCancel }: { onSubmitted: () => void; o
         onChange={(e) => setBody(e.target.value)}
         placeholder="Describe your question in detail..."
         rows={5}
-        className="w-full rounded-lg px-3 py-2 text-sm border outline-none focus:ring-1 transition-theme resize-none"
+        className="w-full rounded-lg px-3 py-2 text-sm border outline-none focus:ring-1 focus:ring-[color:var(--color-accent)] transition-theme resize-none"
         style={{ backgroundColor: "var(--color-bg-input)", borderColor: "var(--color-border)", color: "var(--color-text-primary)" }}
       />
       <input
@@ -173,14 +181,14 @@ function AskQuestionForm({ onSubmitted, onCancel }: { onSubmitted: () => void; o
         value={tagsInput}
         onChange={(e) => setTagsInput(e.target.value)}
         placeholder="Tags (comma-separated): java, spring, debugging"
-        className="w-full rounded-lg px-3 py-2 text-sm border outline-none focus:ring-1 transition-theme"
+        className="w-full rounded-lg px-3 py-2 text-sm border outline-none focus:ring-1 focus:ring-[color:var(--color-accent)] transition-theme"
         style={{ backgroundColor: "var(--color-bg-input)", borderColor: "var(--color-border)", color: "var(--color-text-primary)" }}
       />
       <div className="flex gap-2">
         <button
           onClick={handleSubmit}
           disabled={submitting || !title.trim() || !body.trim()}
-          className="px-4 py-2 rounded-lg text-sm font-medium border transition-all hover:opacity-90 disabled:opacity-50"
+          className="px-4 py-2 rounded-lg text-sm font-semibold font-display border transition-all hover:opacity-90 disabled:opacity-50"
           style={{ backgroundColor: "var(--color-accent)", borderColor: "var(--color-accent)", color: "#000" }}
         >
           {submitting ? "Posting..." : "Post Question"}
@@ -261,17 +269,18 @@ function QuestionDetail({
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
-      <button onClick={onBack} className="text-xs font-medium mb-4 transition-all hover:opacity-80" style={{ color: "var(--color-accent)" }}>
-        ← Back to questions
+      <button onClick={onBack} className="inline-flex items-center gap-1.5 text-xs font-mono font-medium mb-4 transition-all hover:opacity-80" style={{ color: "var(--color-accent)" }}>
+        <Icon name="arrowLeft" size={14} />
+        Back to questions
       </button>
 
       <div className="rounded-xl p-6 border transition-theme" style={{ backgroundColor: "var(--color-bg-card)", borderColor: "var(--color-border)" }}>
         <div className="flex items-center gap-2 mb-2">
-          <h1 className="text-xl font-bold" style={{ color: "var(--color-text-primary)" }}>{question.title}</h1>
+          <h1 className="text-xl font-bold font-display" style={{ color: "var(--color-text-primary)" }}>{question.title}</h1>
           <StatusBadge status={question.status} />
         </div>
-        <p className="text-sm whitespace-pre-wrap" style={{ color: "var(--color-text-secondary)" }}>{question.body}</p>
-        <div className="flex items-center gap-3 mt-3 text-[10px]" style={{ color: "var(--color-text-muted)" }}>
+        <p className="text-sm whitespace-pre-wrap leading-relaxed" style={{ color: "var(--color-text-secondary)" }}>{question.body}</p>
+        <div className="flex items-center gap-3 mt-3 text-[10px] font-mono" style={{ color: "var(--color-text-muted)" }}>
           <span>by {question.author?.name || "Unknown"}</span>
           <span>{new Date(question.createdAt).toLocaleDateString()}</span>
           {question.tags && (
@@ -293,7 +302,7 @@ function QuestionDetail({
         </div>
       </div>
 
-      <h2 className="text-lg font-semibold" style={{ color: "var(--color-text-primary)" }}>{answers.length} Answer(s)</h2>
+      <h2 className="text-lg font-semibold font-display" style={{ color: "var(--color-text-primary)" }}>{answers.length} Answer(s)</h2>
 
       {loading ? (
         <div className="text-sm text-center py-8" style={{ color: "var(--color-text-muted)" }}>Loading answers...</div>
@@ -302,38 +311,45 @@ function QuestionDetail({
           {answers.map((a) => (
             <div
               key={a.id}
-              className="rounded-xl p-4 border transition-theme"
+              className="relative overflow-hidden rounded-xl p-4 border transition-theme"
               style={{
                 backgroundColor: "var(--color-bg-card)",
                 borderColor: a.accepted ? "var(--color-status-resolved)" : "var(--color-border)",
               }}
             >
+              {a.accepted && (
+                <span
+                  className="absolute left-0 top-0 bottom-0 w-[3px]"
+                  style={{ backgroundColor: "var(--color-status-resolved)" }}
+                  aria-hidden="true"
+                />
+              )}
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-sm font-medium" style={{ color: "var(--color-text-primary)" }}>{a.author?.name || "Unknown"}</span>
-                <span className="text-[10px]" style={{ color: "var(--color-text-muted)" }}>
+                <span className="text-sm font-medium font-display" style={{ color: "var(--color-text-primary)" }}>{a.author?.name || "Unknown"}</span>
+                <span className="text-[10px] font-mono" style={{ color: "var(--color-text-muted)" }}>
                   {new Date(a.createdAt).toLocaleDateString()}
                 </span>
                 {a.accepted && (
                   <span
-                    className="px-2 py-0.5 rounded-full text-xs font-medium"
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold uppercase tracking-wider"
                     style={{ backgroundColor: "rgba(34,197,94,0.15)", color: "var(--color-status-resolved)" }}
                   >
-                    ✓ Accepted
+                    <Icon name="check" size={11} /> Accepted
                   </span>
                 )}
                 {a.reportCount > 0 && (
-                  <span className="text-xs" style={{ color: "var(--color-warning)" }}><Icon name="alert" size={12} /> {a.reportCount}</span>
+                  <span className="inline-flex items-center gap-1 text-xs font-mono" style={{ color: "var(--color-warning)" }}><Icon name="alert" size={12} /> {a.reportCount}</span>
                 )}
               </div>
-              <p className="text-sm whitespace-pre-wrap" style={{ color: "var(--color-text-secondary)" }}>{a.body}</p>
-              <div className="flex gap-3 mt-2 text-xs">
+              <p className="text-sm whitespace-pre-wrap leading-relaxed" style={{ color: "var(--color-text-secondary)" }}>{a.body}</p>
+              <div className="flex gap-3 mt-2 text-xs font-mono">
                 {isAuthor && !a.accepted && question.status !== "ANSWERED" && (
                   <button
                     onClick={() => handleAccept(a.id)}
-                    className="transition-all hover:opacity-80"
+                    className="inline-flex items-center gap-1 transition-all hover:opacity-80"
                     style={{ color: "var(--color-status-resolved)" }}
                   >
-                    ✓ Accept this answer
+                    <Icon name="check" size={12} /> Accept this answer
                   </button>
                 )}
                 {!isAuthor && (
@@ -352,19 +368,19 @@ function QuestionDetail({
       )}
 
       <div className="rounded-xl p-4 border transition-theme" style={{ backgroundColor: "var(--color-bg-card)", borderColor: "var(--color-border)" }}>
-        <h3 className="text-sm font-semibold mb-2" style={{ color: "var(--color-text-primary)" }}>Your Answer</h3>
+        <h3 className="text-sm font-semibold font-display mb-2" style={{ color: "var(--color-text-primary)" }}>Your Answer</h3>
         <textarea
           value={newAnswer}
           onChange={(e) => setNewAnswer(e.target.value)}
           placeholder="Write your answer..."
           rows={4}
-          className="w-full rounded-lg px-3 py-2 text-sm border outline-none focus:ring-1 transition-theme resize-none mb-3"
+          className="w-full rounded-lg px-3 py-2 text-sm border outline-none focus:ring-1 focus:ring-[color:var(--color-accent)] transition-theme resize-none mb-3"
           style={{ backgroundColor: "var(--color-bg-input)", borderColor: "var(--color-border)", color: "var(--color-text-primary)" }}
         />
         <button
           onClick={handlePostAnswer}
           disabled={submitting || !newAnswer.trim()}
-          className="px-4 py-2 rounded-lg text-sm font-medium border transition-all hover:opacity-90 disabled:opacity-50"
+          className="px-4 py-2 rounded-lg text-sm font-semibold font-display border transition-all hover:opacity-90 disabled:opacity-50"
           style={{ backgroundColor: "var(--color-accent)", borderColor: "var(--color-accent)", color: "#000" }}
         >
           {submitting ? "Posting..." : "Post Answer"}

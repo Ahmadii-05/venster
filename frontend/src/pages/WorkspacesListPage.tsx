@@ -49,7 +49,8 @@ export default function WorkspacesListPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold" style={{ color: "var(--color-text-primary)" }}>
+          <div className="eyebrow mb-1.5">Workspaces</div>
+          <h1 className="font-display text-2xl font-bold" style={{ color: "var(--color-text-primary)" }}>
             Workspaces
           </h1>
           <p className="text-sm mt-1" style={{ color: "var(--color-text-secondary)" }}>
@@ -58,7 +59,7 @@ export default function WorkspacesListPage() {
         </div>
         <button
           onClick={() => setShowCreate(!showCreate)}
-          className="px-4 py-2 rounded-lg text-sm font-medium transition-all hover:opacity-90"
+          className="px-4 py-2 rounded-lg text-sm font-semibold font-display transition-all hover:opacity-90"
           style={{ backgroundColor: "var(--color-accent)", color: "#000" }}
         >
           + New Workspace
@@ -78,7 +79,7 @@ export default function WorkspacesListPage() {
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleCreate()}
-              className="flex-1 px-3 py-2 rounded-lg text-sm border outline-none focus:ring-1 transition-theme"
+              className="flex-1 px-3 py-2 rounded-lg text-sm border outline-none focus:ring-1 focus:ring-[color:var(--color-accent)] transition-theme"
               style={{ backgroundColor: "var(--color-bg-input)", borderColor: "var(--color-border)", color: "var(--color-text-primary)" }}
               autoFocus
             />
@@ -108,18 +109,23 @@ export default function WorkspacesListPage() {
             <Link
               key={ws.id}
               to={`/workspaces/${ws.id}`}
-              className="rounded-xl p-5 border transition-all hover:scale-[1.02] hover:shadow-lg group"
+              className="relative overflow-hidden rounded-xl p-5 border transition-all hover:-translate-y-0.5 hover:shadow-lg group"
               style={{ backgroundColor: "var(--color-bg-card)", borderColor: "var(--color-border)" }}
             >
+              <span
+                className="absolute left-0 top-0 bottom-0 w-[3px] opacity-0 group-hover:opacity-100 transition-opacity"
+                style={{ backgroundColor: "var(--color-accent)" }}
+                aria-hidden="true"
+              />
               <div className="flex items-center gap-3 mb-3">
                 <div
-                  className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold"
+                  className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold font-display"
                   style={{ backgroundColor: "var(--color-accent-dim)", color: "var(--color-accent)" }}
                 >
                   {ws.name.substring(0, 2).toUpperCase()}
                 </div>
                 <div>
-                  <div className="text-sm font-semibold group-hover:text-[var(--color-accent)] transition-colors" style={{ color: "var(--color-text-primary)" }}>
+                  <div className="text-sm font-semibold font-display group-hover:text-[var(--color-accent)] transition-colors" style={{ color: "var(--color-text-primary)" }}>
                     {ws.name}
                   </div>
                   <div className="text-[10px] font-mono" style={{ color: "var(--color-text-muted)" }}>
@@ -127,7 +133,7 @@ export default function WorkspacesListPage() {
                   </div>
                 </div>
               </div>
-              <div className="flex items-center justify-between text-[10px]" style={{ color: "var(--color-text-muted)" }}>
+              <div className="flex items-center justify-between text-[10px] font-mono" style={{ color: "var(--color-text-muted)" }}>
                 <span>{ws.id.substring(0, 8)}</span>
                 <span>{timeAgo(ws.createdAt)}</span>
               </div>

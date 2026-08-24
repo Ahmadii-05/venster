@@ -2,14 +2,15 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { notificationApi } from "../services/api";
 import type { Notification } from "../types";
+import Icon, { type IconName } from "../components/ui/Icon";
 
-const TYPE_ICONS: Record<string, { icon: string; color: string }> = {
-  CAPSULE_ASSIGNED: { icon: "👤", color: "var(--color-status-review)" },
-  CAPSULE_COMMENTED: { icon: "💬", color: "var(--color-status-open)" },
-  CAPSULE_RESOLVED: { icon: "✅", color: "var(--color-status-resolved)" },
-  CAPSULE_STATUS_CHANGED: { icon: "🔄", color: "var(--color-status-answered)" },
-  COMMENT: { icon: "💬", color: "var(--color-status-open)" },
-  MENTION: { icon: "@", color: "var(--color-accent)" },
+const TYPE_ICONS: Record<string, { icon: IconName; color: string }> = {
+  CAPSULE_ASSIGNED: { icon: "user", color: "var(--color-status-review)" },
+  CAPSULE_COMMENTED: { icon: "chat", color: "var(--color-status-open)" },
+  CAPSULE_RESOLVED: { icon: "check", color: "var(--color-status-resolved)" },
+  CAPSULE_STATUS_CHANGED: { icon: "reply", color: "var(--color-status-answered)" },
+  COMMENT: { icon: "chat", color: "var(--color-status-open)" },
+  MENTION: { icon: "user", color: "var(--color-accent)" },
 };
 
 function timeAgo(dateStr: string): string {
@@ -70,10 +71,8 @@ export default function NotificationsPage() {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <div className="text-[10px] uppercase tracking-widest font-mono mb-1" style={{ color: "var(--color-accent)" }}>
-            INBOX
-          </div>
-          <h1 className="text-2xl font-bold" style={{ color: "var(--color-text-primary)" }}>
+          <div className="eyebrow mb-1.5">Inbox</div>
+          <h1 className="font-display text-2xl font-bold" style={{ color: "var(--color-text-primary)" }}>
             Notifications
           </h1>
           <p className="text-sm mt-1" style={{ color: "var(--color-text-secondary)" }}>
@@ -83,7 +82,7 @@ export default function NotificationsPage() {
         {unreadCount > 0 && (
           <button
             onClick={handleMarkAllRead}
-            className="px-3 py-2 rounded-lg text-xs font-medium border transition-all hover:opacity-80"
+            className="px-3 py-2 rounded-lg text-xs font-mono font-medium border transition-all hover:opacity-80"
             style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}
           >
             Mark all read ({unreadCount})
@@ -111,24 +110,31 @@ export default function NotificationsPage() {
       ) : (
         <div className="space-y-2">
           {notifications.map((n) => {
-            const typeInfo = TYPE_ICONS[n.type] || { icon: "🔔", color: "var(--color-text-muted)" };
+            const typeInfo = TYPE_ICONS[n.type] || { icon: "bell" as IconName, color: "var(--color-text-muted)" };
             return (
               <div
                 key={n.id}
-                className="rounded-xl p-4 border transition-all flex items-start gap-4"
+                className="relative overflow-hidden rounded-xl p-4 border transition-all flex items-start gap-4"
                 style={{
                   backgroundColor: n.read ? "var(--color-bg-card)" : "var(--color-bg-elevated)",
                   borderColor: n.read ? "var(--color-border)" : "var(--color-accent)",
                   opacity: n.read ? 0.7 : 1,
                 }}
               >
+                {!n.read && (
+                  <span
+                    className="absolute left-0 top-0 bottom-0 w-[3px]"
+                    style={{ backgroundColor: typeInfo.color }}
+                    aria-hidden="true"
+                  />
+                )}
                 {/* Unread dot + icon */}
                 <div className="relative shrink-0">
                   <div
-                    className="w-9 h-9 rounded-lg flex items-center justify-center text-base"
+                    className="w-9 h-9 rounded-lg flex items-center justify-center"
                     style={{ backgroundColor: "var(--color-bg-input)", color: typeInfo.color }}
                   >
-                    {typeInfo.icon}
+                    <Icon name={typeInfo.icon} size={16} />
                   </div>
                   {!n.read && (
                     <div
@@ -142,7 +148,7 @@ export default function NotificationsPage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-0.5">
                     <span
-                      className="text-[10px] uppercase tracking-widest font-mono"
+                      className="eyebrow"
                       style={{ color: typeInfo.color }}
                     >
                       {n.type.replace(/_/g, " ")}
@@ -157,7 +163,7 @@ export default function NotificationsPage() {
                   <p className="text-sm" style={{ color: "var(--color-text-primary)" }}>
                     {n.context || "No details available"}
                   </p>
-                  <div className="flex items-center gap-2 mt-1 text-[10px]" style={{ color: "var(--color-text-muted)" }}>
+                  <div className="flex items-center gap-2 mt-1 text-[10px] font-mono" style={{ color: "var(--color-text-muted)" }}>
                     <span>{timeAgo(n.createdAt)}</span>
                   </div>
                 </div>
@@ -167,7 +173,7 @@ export default function NotificationsPage() {
                   {!n.read && (
                     <button
                       onClick={() => handleMarkAsRead(n.id)}
-                      className="px-2 py-1 rounded text-[10px] font-medium border transition-all hover:opacity-80"
+                      className="px-2 py-1 rounded text-[10px] font-mono font-medium border transition-all hover:opacity-80"
                       style={{ backgroundColor: "var(--color-bg-input)", borderColor: "var(--color-border)", color: "var(--color-text-muted)" }}
                     >
                       Mark read
@@ -175,7 +181,7 @@ export default function NotificationsPage() {
                   )}
                   <Link
                     to="/"
-                    className="px-2 py-1 rounded text-[10px] font-medium transition-all hover:opacity-80"
+                    className="px-2 py-1 rounded text-[10px] font-mono font-medium transition-all hover:opacity-80"
                     style={{ color: "var(--color-accent)" }}
                   >
                     Open

@@ -19,10 +19,21 @@ public interface KnowledgeRepository extends JpaRepository<KnowledgeItem, UUID> 
 
     boolean existsByGlobalAnswerId(UUID globalAnswerId);
 
+    /** Idempotency guard for the global-knowledge seeder — exact-title match. */
+    boolean existsByTitle(String title);
+
     List<KnowledgeItem> findByTitleContainingIgnoreCase(String title);
 
     List<KnowledgeItem> findByVisibilityAndTitleContainingIgnoreCase(
             KnowledgeVisibility visibility, String title);
+
+    /**
+     * Browse mode: the most-recent items of a given visibility, no query or
+     * embedding required. Powers the Global Community landing view so solved
+     * problems are visible before the user searches. Capped at 50.
+     */
+    List<KnowledgeItem> findTop50ByVisibilityOrderByCreatedAtDesc(
+            KnowledgeVisibility visibility);
 
     // -- pgvector similarity search (workspace-scoped) --
 

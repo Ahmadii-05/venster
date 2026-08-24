@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
+import Logo from "../components/ui/Logo";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -43,11 +44,8 @@ export default function LoginPage() {
       <div className="w-full max-w-md px-6">
         {/* Brand */}
         <div className="text-center mb-8">
-          <div
-            className="w-12 h-12 rounded-xl flex items-center justify-center text-xl font-bold mx-auto mb-3"
-            style={{ backgroundColor: "var(--color-accent)", color: "#000" }}
-          >
-            V
+          <div className="flex justify-center mb-3">
+            <Logo size={48} style={{ color: "var(--color-accent)" }} />
           </div>
           <h1 className="text-xl font-bold" style={{ color: "var(--color-text-primary)" }}>
             Welcome back

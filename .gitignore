@@ -16,6 +16,12 @@ target/
 .vscode/
 *.swp
 *.swo
+# Eclipse / Spring Tool Suite
+.classpath
+.project
+.settings/
+.apt_generated/
+bin/
 
 # === OS ===
 .DS_Store
@@ -28,3 +34,18 @@ frontend/build/
 
 # === Maven ===
 .mvn/wrapper/maven-wrapper.jar
+
+# === VS Code extension build output ===
+vscode-extension/node_modules/
+vscode-extension/out/
+
+# === Scratch / verification artifacts ===
+# jar-check/ is an unpacked Spring Boot jar used for one-off inspection.
+jar-check/
+# src_backup/ is an old backup-of-a-backup of the source tree.
+src_backup/
+# Stale duplicate frontend accidentally nested under the backend module.
+microhubs-backend/frontend/
+
+# === Dead/removed backend (see CODE_REVIEW.md) ===
+/backend/

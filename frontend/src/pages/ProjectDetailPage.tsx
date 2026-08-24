@@ -1,11 +1,16 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
-import { capsuleApi, artifactApi } from "../services/api";
+import { capsuleApi, artifactApi, projectApi } from "../services/api";
 import {
   type Capsule,
   type CapsuleStatus,
   type CapsulePriority,
+  type Project,
+  type ProjectStatus,
+  type ProjectPriority,
   STATUS_COLORS,
+  PROJECT_STATUS_LABELS,
+  PROJECT_STATUS_STYLES,
 } from "../types";
 
 const ALL_STATUSES: (CapsuleStatus | "ALL")[] = [
@@ -17,6 +22,13 @@ const ALL_STATUSES: (CapsuleStatus | "ALL")[] = [
   "ARCHIVED",
 ];
 
+// Text colors for the project priority label, reusing the shared tokens.
+const PROJECT_PRIORITY_COLORS: Record<ProjectPriority, string> = {
+  HIGH: "var(--color-priority-high)",
+  MEDIUM: "var(--color-priority-medium)",
+  LOW: "var(--color-priority-low)",
+};
+
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [projectName, setProjectName] = useState("");
@@ -26,6 +38,18 @@ export default function ProjectDetailPage() {
     "ALL"
   );
   const [error, setError] = useState("");
+
+  // ── Project entity + edit-form state ──────────────────────
+  const [project, setProject] = useState<Project | null>(null);
+  const [showEditProject, setShowEditProject] = useState(false);
+  const [savingProject, setSavingProject] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editDesc, setEditDesc] = useState("");
+  const [editRepo, setEditRepo] = useState("");
+  const [editTech, setEditTech] = useState("");
+  const [editStatus, setEditStatus] = useState<ProjectStatus>("PLANNING");
+  const [editPriority, setEditPriority] = useState<ProjectPriority>("MEDIUM");
+  const [editTarget, setEditTarget] = useState(""); // yyyy-MM-dd
 
   // ── Create Capsule state ──────────────────────────────────
   const [showCreate, setShowCreate] = useState(false);
@@ -60,25 +84,68 @@ export default function ProjectDetailPage() {
     fetchCapsules();
   }, [fetchCapsules]);
 
-  useEffect(() => {
+  // Load the project entity itself (name, tech details, status…). Falls back
+  // to the capsule-derived name only if the project fetch fails.
+  const fetchProject = useCallback(async () => {
     if (!id) return;
-    const fetchName = async () => {
+    try {
+      const proj = await projectApi.get(id);
+      setProject(proj);
+      setProjectName(proj.name);
+    } catch {
       try {
-        const capsules = await capsuleApi.list({ projectId: id });
-        if (capsules.length > 0) {
-          setProjectName(
-            capsules[0].artifactAnchor?.artifactVersion?.artifact?.project
-              ?.name || "Project"
-          );
-        } else {
-          setProjectName("Project");
-        }
+        const caps = await capsuleApi.list({ projectId: id });
+        setProjectName(
+          caps[0]?.artifactAnchor?.artifactVersion?.artifact?.project?.name ||
+            "Project"
+        );
       } catch {
         setProjectName("Project");
       }
-    };
-    fetchName();
+    }
   }, [id]);
+
+  useEffect(() => {
+    fetchProject();
+  }, [fetchProject]);
+
+  // Pre-fill the edit form from the loaded project whenever it opens.
+  const openEditProject = () => {
+    if (project) {
+      setEditName(project.name);
+      setEditDesc(project.description || "");
+      setEditRepo(project.repositoryUrl || "");
+      setEditTech(project.techStack || "");
+      setEditStatus(project.status || "PLANNING");
+      setEditPriority(project.priority || "MEDIUM");
+      setEditTarget(project.targetDate || "");
+    }
+    setShowEditProject(true);
+  };
+
+  const handleUpdateProject = async () => {
+    if (!id || editName.trim().length < 3) return;
+    setSavingProject(true);
+    setError("");
+    try {
+      const updated = await projectApi.update(id, {
+        name: editName.trim(),
+        description: editDesc.trim() || undefined,
+        repositoryUrl: editRepo.trim() || undefined,
+        techStack: editTech.trim() || undefined,
+        status: editStatus,
+        priority: editPriority,
+        targetDate: editTarget || undefined,
+      });
+      setProject(updated);
+      setProjectName(updated.name);
+      setShowEditProject(false);
+    } catch (err: any) {
+      setError(err.message || "Failed to update project");
+    } finally {
+      setSavingProject(false);
+    }
+  };
 
   // ── Handle capsule creation (chains 4 API calls) ──────────
   const handleCreateCapsule = async () => {
@@ -190,6 +257,320 @@ export default function ProjectDetailPage() {
           >
             dismiss
           </button>
+        </div>
+      )}
+
+      {/* ── Project info card / edit form ──────────────────── */}
+      {project && (
+        <div
+          className="rounded-xl p-5 border transition-theme"
+          style={{
+            backgroundColor: "var(--color-bg-card)",
+            borderColor: "var(--color-border)",
+          }}
+        >
+          {!showEditProject ? (
+            <div className="space-y-3">
+              {/* Badges + Edit button */}
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {project.status && (
+                    <span
+                      className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold uppercase tracking-wider"
+                      style={{
+                        backgroundColor: PROJECT_STATUS_STYLES[project.status].bg,
+                        color: PROJECT_STATUS_STYLES[project.status].text,
+                      }}
+                    >
+                      {PROJECT_STATUS_LABELS[project.status]}
+                    </span>
+                  )}
+                  {project.priority && (
+                    <span
+                      className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold uppercase tracking-wider border"
+                      style={{
+                        color: PROJECT_PRIORITY_COLORS[project.priority],
+                        borderColor: "var(--color-border)",
+                      }}
+                    >
+                      {project.priority} priority
+                    </span>
+                  )}
+                </div>
+                <button
+                  onClick={openEditProject}
+                  className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all hover:opacity-90"
+                  style={{
+                    backgroundColor: "var(--color-bg-input)",
+                    borderColor: "var(--color-border)",
+                    color: "var(--color-text-secondary)",
+                  }}
+                >
+                  ✎ Edit project
+                </button>
+              </div>
+
+              {/* Details grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                <div className="min-w-0">
+                  <div
+                    className="text-[10px] uppercase tracking-wider font-mono mb-0.5"
+                    style={{ color: "var(--color-text-muted)" }}
+                  >
+                    Repository
+                  </div>
+                  {project.repositoryUrl ? (
+                    <a
+                      href={project.repositoryUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="truncate block hover:underline"
+                      style={{ color: "var(--color-accent)" }}
+                    >
+                      {project.repositoryUrl}
+                    </a>
+                  ) : (
+                    <span style={{ color: "var(--color-text-muted)" }}>—</span>
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <div
+                    className="text-[10px] uppercase tracking-wider font-mono mb-0.5"
+                    style={{ color: "var(--color-text-muted)" }}
+                  >
+                    Tech stack
+                  </div>
+                  <span
+                    style={{
+                      color: project.techStack
+                        ? "var(--color-text-primary)"
+                        : "var(--color-text-muted)",
+                    }}
+                  >
+                    {project.techStack || "—"}
+                  </span>
+                </div>
+                <div className="min-w-0">
+                  <div
+                    className="text-[10px] uppercase tracking-wider font-mono mb-0.5"
+                    style={{ color: "var(--color-text-muted)" }}
+                  >
+                    Target date
+                  </div>
+                  <span
+                    style={{
+                      color: project.targetDate
+                        ? "var(--color-text-primary)"
+                        : "var(--color-text-muted)",
+                    }}
+                  >
+                    {project.targetDate
+                      ? new Date(project.targetDate).toLocaleDateString()
+                      : "—"}
+                  </span>
+                </div>
+              </div>
+
+              {project.description && (
+                <p
+                  className="text-sm pt-1"
+                  style={{ color: "var(--color-text-secondary)" }}
+                >
+                  {project.description}
+                </p>
+              )}
+            </div>
+          ) : (
+            /* ── Edit form ── */
+            <div className="space-y-3">
+              <div
+                className="text-xs uppercase tracking-widest font-mono"
+                style={{ color: "var(--color-accent)" }}
+              >
+                EDIT PROJECT
+              </div>
+
+              <div>
+                <label
+                  className="text-[10px] font-mono uppercase tracking-wider mb-1 block"
+                  style={{ color: "var(--color-text-muted)" }}
+                >
+                  Name *
+                </label>
+                <input
+                  type="text"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg text-sm border outline-none focus:ring-1 transition-theme"
+                  style={{
+                    backgroundColor: "var(--color-bg-input)",
+                    borderColor: "var(--color-border)",
+                    color: "var(--color-text-primary)",
+                  }}
+                />
+              </div>
+
+              <div>
+                <label
+                  className="text-[10px] font-mono uppercase tracking-wider mb-1 block"
+                  style={{ color: "var(--color-text-muted)" }}
+                >
+                  Description
+                </label>
+                <input
+                  type="text"
+                  placeholder="Optional"
+                  value={editDesc}
+                  onChange={(e) => setEditDesc(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg text-sm border outline-none focus:ring-1 transition-theme"
+                  style={{
+                    backgroundColor: "var(--color-bg-input)",
+                    borderColor: "var(--color-border)",
+                    color: "var(--color-text-primary)",
+                  }}
+                />
+              </div>
+
+              <div>
+                <label
+                  className="text-[10px] font-mono uppercase tracking-wider mb-1 block"
+                  style={{ color: "var(--color-text-muted)" }}
+                >
+                  Repository URL
+                </label>
+                <input
+                  type="url"
+                  placeholder="https://github.com/org/repo"
+                  value={editRepo}
+                  onChange={(e) => setEditRepo(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg text-sm border outline-none focus:ring-1 font-mono transition-theme"
+                  style={{
+                    backgroundColor: "var(--color-bg-input)",
+                    borderColor: "var(--color-border)",
+                    color: "var(--color-text-primary)",
+                  }}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label
+                    className="text-[10px] font-mono uppercase tracking-wider mb-1 block"
+                    style={{ color: "var(--color-text-muted)" }}
+                  >
+                    Tech stack
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Java · Spring Boot · React"
+                    value={editTech}
+                    onChange={(e) => setEditTech(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg text-sm border outline-none focus:ring-1 transition-theme"
+                    style={{
+                      backgroundColor: "var(--color-bg-input)",
+                      borderColor: "var(--color-border)",
+                      color: "var(--color-text-primary)",
+                    }}
+                  />
+                </div>
+                <div>
+                  <label
+                    className="text-[10px] font-mono uppercase tracking-wider mb-1 block"
+                    style={{ color: "var(--color-text-muted)" }}
+                  >
+                    Target date
+                  </label>
+                  <input
+                    type="date"
+                    value={editTarget}
+                    onChange={(e) => setEditTarget(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg text-sm border outline-none focus:ring-1 transition-theme"
+                    style={{
+                      backgroundColor: "var(--color-bg-input)",
+                      borderColor: "var(--color-border)",
+                      color: "var(--color-text-primary)",
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label
+                    className="text-[10px] font-mono uppercase tracking-wider mb-1 block"
+                    style={{ color: "var(--color-text-muted)" }}
+                  >
+                    Status
+                  </label>
+                  <select
+                    value={editStatus}
+                    onChange={(e) => setEditStatus(e.target.value as ProjectStatus)}
+                    className="w-full px-3 py-2 rounded-lg text-sm border outline-none transition-theme"
+                    style={{
+                      backgroundColor: "var(--color-bg-input)",
+                      borderColor: "var(--color-border)",
+                      color: "var(--color-text-primary)",
+                    }}
+                  >
+                    {(Object.keys(PROJECT_STATUS_LABELS) as ProjectStatus[]).map(
+                      (s) => (
+                        <option key={s} value={s}>
+                          {PROJECT_STATUS_LABELS[s]}
+                        </option>
+                      )
+                    )}
+                  </select>
+                </div>
+                <div>
+                  <label
+                    className="text-[10px] font-mono uppercase tracking-wider mb-1 block"
+                    style={{ color: "var(--color-text-muted)" }}
+                  >
+                    Priority
+                  </label>
+                  <select
+                    value={editPriority}
+                    onChange={(e) =>
+                      setEditPriority(e.target.value as ProjectPriority)
+                    }
+                    className="w-full px-3 py-2 rounded-lg text-sm border outline-none transition-theme"
+                    style={{
+                      backgroundColor: "var(--color-bg-input)",
+                      borderColor: "var(--color-border)",
+                      color: "var(--color-text-primary)",
+                    }}
+                  >
+                    <option value="LOW">Low</option>
+                    <option value="MEDIUM">Medium</option>
+                    <option value="HIGH">High</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={handleUpdateProject}
+                  disabled={editName.trim().length < 3 || savingProject}
+                  className="px-4 py-2 rounded-lg text-sm font-medium transition-all hover:opacity-90 disabled:opacity-50"
+                  style={{ backgroundColor: "var(--color-accent)", color: "#000" }}
+                >
+                  {savingProject ? "Saving..." : "Save changes"}
+                </button>
+                <button
+                  onClick={() => setShowEditProject(false)}
+                  disabled={savingProject}
+                  className="px-4 py-2 rounded-lg text-sm font-medium border transition-all hover:opacity-90 disabled:opacity-50"
+                  style={{
+                    backgroundColor: "var(--color-bg-input)",
+                    borderColor: "var(--color-border)",
+                    color: "var(--color-text-secondary)",
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

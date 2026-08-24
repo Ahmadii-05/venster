@@ -100,9 +100,13 @@ public class ResolutionService {
      * Get a resolution for a capsule.
      */
     @Transactional(readOnly = true)
-    public ApiResponse<Resolution> getResolution(UUID capsuleId) {
+    public ApiResponse<Resolution> getResolution(UUID capsuleId, String email) {
+        User user = getUser(email);
         Resolution resolution = resolutionRepository.findByCapsuleId(capsuleId)
                 .orElseThrow(() -> new RuntimeException("Resolution not found for this capsule"));
+
+        // Only workspace members may read a resolution
+        verifyWorkspaceMembership(resolution.getCapsule(), user);
         return ApiResponse.success(resolution);
     }
 
@@ -143,5 +147,23 @@ public class ResolutionService {
 
         throw new AccessDeniedException(
                 "Only the capsule's reviewer or a workspace ADMIN/OWNER may resolve it");
+    }
+
+    /**
+     * Verify the user is a member (any role) of the capsule's workspace.
+     */
+    private void verifyWorkspaceMembership(Capsule capsule, User user) {
+        Workspace workspace = capsule.getArtifactAnchor()
+                .getArtifactVersion()
+                .getArtifact()
+                .getProject()
+                .getWorkspace();
+
+        boolean isMember = workspaceMemberRepository
+                .existsByWorkspaceAndUser(workspace, user);
+        if (!isMember) {
+            throw new AccessDeniedException(
+                    "User is not a member of this workspace");
+        }
     }
 }

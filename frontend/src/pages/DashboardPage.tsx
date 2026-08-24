@@ -70,9 +70,12 @@ export default function DashboardPage() {
   /* Fetch all data */
   useEffect(() => {
     const load = async () => {
+      // Declared at function scope so the knowledge-health block below (which
+      // runs after the try/finally, outside its block) can read it.
+      let ws: Workspace[] = [];
       try {
-        const ws = await workspaceApi.list();
-        setWorkspaces(ws || []);
+        ws = (await workspaceApi.list()) || [];
+        setWorkspaces(ws);
 
         const allProjs: Project[] = [];
         const allCaps: Capsule[] = [];
@@ -195,36 +198,50 @@ export default function DashboardPage() {
         {/* ── Main Column ── */}
         <div className="flex-1 min-w-0 space-y-6">
 
-          {/* 1. Welcome Area */}
-          <div className="flex items-start justify-between">
-            <div>
-              <div className="text-[10px] uppercase tracking-[0.2em] font-mono font-semibold mb-1" style={{ color: "var(--color-accent)" }}>
-                OVERVIEW
+          {/* 1. Hero band — leads with a sentence */}
+          <div
+            className="relative overflow-hidden rounded-2xl border p-6 transition-theme"
+            style={{
+              borderColor: "var(--color-border)",
+              backgroundColor: "var(--color-bg-card)",
+              backgroundImage: "linear-gradient(135deg, var(--color-accent-dim), transparent 55%)",
+            }}
+          >
+            <span
+              className="absolute left-0 top-6 bottom-6 w-[3px] rounded-full"
+              style={{ backgroundColor: "var(--color-accent)" }}
+              aria-hidden="true"
+            />
+            <div className="flex items-start justify-between gap-4 pl-3">
+              <div>
+                <div className="eyebrow mb-2">Overview</div>
+                <h1 className="font-display text-[26px] leading-tight font-bold" style={{ color: "var(--color-text-primary)" }}>
+                  {greeting}, {name}
+                </h1>
+                <p className="text-sm mt-2 max-w-md leading-relaxed" style={{ color: "var(--color-text-secondary)" }}>
+                  Ask where you work, learn from everyone — capture the{" "}
+                  <span className="font-mono font-medium" style={{ color: "var(--color-text-primary)" }}>why</span>{" "}
+                  where the code lives.
+                </p>
               </div>
-              <h1 className="text-2xl font-bold" style={{ color: "var(--color-text-primary)" }}>
-                {greeting}, {name}
-              </h1>
-              <p className="text-sm mt-1" style={{ color: "var(--color-text-secondary)" }}>
-                Ask where you work. Learn from everyone.
-              </p>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <button
-                onClick={() => setShowCreateWs(!showCreateWs)}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium border transition-all hover:opacity-80"
-                style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}
-              >
-                <Icon name="plus" size={14} />
-                New Workspace
-              </button>
-              <Link
-                to="/"
-                className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium border transition-all hover:opacity-80"
-                style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}
-              >
-                <Icon name="externalLink" size={14} />
-                Open Capsule board
-              </Link>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={() => setShowCreateWs(!showCreateWs)}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium border transition-all hover:opacity-80"
+                  style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)", backgroundColor: "var(--color-bg-card)" }}
+                >
+                  <Icon name="plus" size={14} />
+                  New Workspace
+                </button>
+                <Link
+                  to="/"
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium border transition-all hover:opacity-80"
+                  style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)", backgroundColor: "var(--color-bg-card)" }}
+                >
+                  <Icon name="externalLink" size={14} />
+                  Open Capsule board
+                </Link>
+              </div>
             </div>
           </div>
 
@@ -271,10 +288,13 @@ export default function DashboardPage() {
           {/* 3. Trending Capsules */}
           <div>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="flex items-center gap-2 text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>
-                <Icon name="trending" size={18} />
-                Trending Capsules
-              </h2>
+              <div>
+                <div className="eyebrow mb-1" style={{ color: "var(--color-text-muted)" }}>Live</div>
+                <h2 className="flex items-center gap-2 font-display text-lg font-semibold" style={{ color: "var(--color-text-primary)" }}>
+                  <Icon name="trending" size={18} style={{ color: "var(--color-accent)" }} />
+                  Trending Capsules
+                </h2>
+              </div>
               <Link to="/" className="flex items-center gap-1 text-xs font-medium transition-all hover:opacity-80" style={{ color: "var(--color-accent)" }}>
                 View all
                 <Icon name="chevronRight" size={14} />
@@ -309,7 +329,7 @@ export default function DashboardPage() {
                 className="rounded-xl border p-5 transition-theme"
                 style={{ backgroundColor: "var(--color-bg-card)", borderColor: "var(--color-border)" }}
               >
-                <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: "var(--color-text-muted)" }}>
+                <h3 className="flex items-center gap-2 text-[10.5px] font-mono font-semibold uppercase tracking-[0.15em] mb-4" style={{ color: "var(--color-text-muted)" }}>
                   <Icon name="clock" size={14} />
                   Aging Capsules
                 </h3>
@@ -382,7 +402,7 @@ export default function DashboardPage() {
                 className="rounded-xl border p-5 transition-theme"
                 style={{ backgroundColor: "var(--color-bg-card)", borderColor: "var(--color-border)" }}
               >
-                <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: "var(--color-text-muted)" }}>
+                <h3 className="flex items-center gap-2 text-[10.5px] font-mono font-semibold uppercase tracking-[0.15em] mb-4" style={{ color: "var(--color-text-muted)" }}>
                   <Icon name="alert" size={14} />
                   Hot Files
                 </h3>
@@ -432,10 +452,13 @@ export default function DashboardPage() {
           {/* 5. Recent Knowledge */}
           <div>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="flex items-center gap-2 text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>
-                <Icon name="knowledge" size={18} />
-                Recent Knowledge
-              </h2>
+              <div>
+                <div className="eyebrow mb-1" style={{ color: "var(--color-text-muted)" }}>Captured</div>
+                <h2 className="flex items-center gap-2 font-display text-lg font-semibold" style={{ color: "var(--color-text-primary)" }}>
+                  <Icon name="knowledge" size={18} style={{ color: "var(--color-accent)" }} />
+                  Recent Knowledge
+                </h2>
+              </div>
               <Link to="/knowledge" className="flex items-center gap-1 text-xs font-medium transition-all hover:opacity-80" style={{ color: "var(--color-accent)" }}>
                 Search Knowledge Base
                 <Icon name="search" size={14} />
@@ -449,8 +472,8 @@ export default function DashboardPage() {
               />
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {knowledgeItems.map((ki) => (
-                  <KnowledgeCard key={ki.id} item={ki} onView={() => navigate("/knowledge")} />
+                {knowledgeItems.map((ki, i) => (
+                  <KnowledgeCard key={ki.id} item={ki} index={i} onView={() => navigate("/knowledge")} />
                 ))}
               </div>
             )}

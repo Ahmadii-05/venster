@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { workspaceApi, projectApi, capsuleApi, knowledgeApi } from "../services/api";
 import type { Workspace, Capsule, KnowledgeItem } from "../types";
+import KnowledgeCard from "../components/KnowledgeCard";
 
 const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
   OPEN: { bg: "rgba(56, 189, 248, 0.15)", text: "var(--color-status-open)" },
@@ -14,6 +15,7 @@ const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
 
 export default function ProfilePage() {
   const { email, logout } = useAuth();
+  const navigate = useNavigate();
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [assignedCapsules, setAssignedCapsules] = useState<Capsule[]>([]);
   const [knowledgeItems, setKnowledgeItems] = useState<KnowledgeItem[]>([]);
@@ -55,20 +57,19 @@ export default function ProfilePage() {
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
       {/* Header Card */}
-      <div className="rounded-xl p-6 border transition-theme" style={{ backgroundColor: "var(--color-bg-card)", borderColor: "var(--color-border)" }}>
+      <div className="relative overflow-hidden rounded-xl p-6 pl-7 border transition-theme" style={{ backgroundColor: "var(--color-bg-card)", borderColor: "var(--color-border)" }}>
+        <span className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ backgroundColor: "var(--color-accent)" }} aria-hidden="true" />
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div
-              className="w-14 h-14 rounded-xl flex items-center justify-center text-xl font-bold"
+              className="w-14 h-14 rounded-xl flex items-center justify-center text-xl font-bold font-display"
               style={{ backgroundColor: "var(--color-accent-dim)", color: "var(--color-accent)" }}
             >
               {initials}
             </div>
             <div>
-              <div className="text-[10px] uppercase tracking-widest font-mono mb-0.5" style={{ color: "var(--color-accent)" }}>
-                ACCOUNT
-              </div>
-              <h1 className="text-xl font-bold" style={{ color: "var(--color-text-primary)" }}>
+              <div className="eyebrow mb-0.5">Account</div>
+              <h1 className="text-xl font-bold font-display" style={{ color: "var(--color-text-primary)" }}>
                 {displayName}
               </h1>
               <p className="text-xs font-mono" style={{ color: "var(--color-text-muted)" }}>
@@ -78,7 +79,7 @@ export default function ProfilePage() {
           </div>
           <button
             onClick={logout}
-            className="px-4 py-2 rounded-lg text-xs font-medium border transition-all hover:opacity-80"
+            className="px-4 py-2 rounded-lg text-xs font-mono font-medium border transition-all hover:opacity-80"
             style={{ borderColor: "var(--color-border)", color: "var(--color-danger)" }}
           >
             Logout
@@ -88,35 +89,38 @@ export default function ProfilePage() {
         {/* Stats */}
         <div className="grid grid-cols-3 gap-4 mt-6">
           <div
-            className="rounded-lg p-3 border text-center"
+            className="relative overflow-hidden rounded-lg p-3 pl-4 border text-center"
             style={{ backgroundColor: "var(--color-bg-input)", borderColor: "var(--color-border)" }}
           >
-            <div className="text-[10px] uppercase tracking-widest font-mono mb-1" style={{ color: "var(--color-text-muted)" }}>
+            <span className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ backgroundColor: "var(--color-accent)" }} aria-hidden="true" />
+            <div className="eyebrow mb-1" style={{ color: "var(--color-text-muted)" }}>
               Workspaces
             </div>
-            <div className="text-2xl font-bold" style={{ color: "var(--color-accent)" }}>
+            <div className="text-2xl font-bold font-mono" style={{ color: "var(--color-accent)" }}>
               {workspaces.length}
             </div>
           </div>
           <div
-            className="rounded-lg p-3 border text-center"
+            className="relative overflow-hidden rounded-lg p-3 pl-4 border text-center"
             style={{ backgroundColor: "var(--color-bg-input)", borderColor: "var(--color-border)" }}
           >
-            <div className="text-[10px] uppercase tracking-widest font-mono mb-1" style={{ color: "var(--color-text-muted)" }}>
+            <span className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ backgroundColor: "var(--color-status-review)" }} aria-hidden="true" />
+            <div className="eyebrow mb-1" style={{ color: "var(--color-text-muted)" }}>
               Assigned
             </div>
-            <div className="text-2xl font-bold" style={{ color: "var(--color-status-review)" }}>
+            <div className="text-2xl font-bold font-mono" style={{ color: "var(--color-status-review)" }}>
               {assignedCapsules.length}
             </div>
           </div>
           <div
-            className="rounded-lg p-3 border text-center"
+            className="relative overflow-hidden rounded-lg p-3 pl-4 border text-center"
             style={{ backgroundColor: "var(--color-bg-input)", borderColor: "var(--color-border)" }}
           >
-            <div className="text-[10px] uppercase tracking-widest font-mono mb-1" style={{ color: "var(--color-text-muted)" }}>
+            <span className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ backgroundColor: "var(--color-status-resolved)" }} aria-hidden="true" />
+            <div className="eyebrow mb-1" style={{ color: "var(--color-text-muted)" }}>
               Knowledge
             </div>
-            <div className="text-2xl font-bold" style={{ color: "var(--color-status-resolved)" }}>
+            <div className="text-2xl font-bold font-mono" style={{ color: "var(--color-status-resolved)" }}>
               {knowledgeItems.length}
             </div>
           </div>
@@ -125,8 +129,8 @@ export default function ProfilePage() {
 
       {/* Assigned Capsules */}
       <div>
-        <div className="text-[10px] uppercase tracking-widest font-mono mb-3" style={{ color: "var(--color-text-muted)" }}>
-          ASSIGNED TO YOU
+        <div className="eyebrow mb-3" style={{ color: "var(--color-text-muted)" }}>
+          Assigned to you
         </div>
         {assignedCapsules.length === 0 ? (
           <div
@@ -145,9 +149,10 @@ export default function ProfilePage() {
                 <Link
                   key={cap.id}
                   to={`/capsules/${cap.id}`}
-                  className="block rounded-xl p-4 border transition-all hover:opacity-90"
+                  className="relative overflow-hidden block rounded-xl p-4 pl-5 border transition-all hover:-translate-y-0.5 hover:shadow-lg group"
                   style={{ backgroundColor: "var(--color-bg-card)", borderColor: "var(--color-border)" }}
                 >
+                  <span className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ backgroundColor: sc.text }} aria-hidden="true" />
                   <div className="flex items-center justify-between">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
@@ -155,20 +160,20 @@ export default function ProfilePage() {
                           {cap.id.substring(0, 8).toUpperCase()}
                         </span>
                         <span
-                          className="px-2 py-0.5 rounded text-[10px] font-medium"
+                          className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold uppercase tracking-wider"
                           style={{ backgroundColor: sc.bg, color: sc.text }}
                         >
                           {cap.status.replace("_", " ")}
                         </span>
                       </div>
-                      <h3 className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>
+                      <h3 className="text-sm font-semibold font-display group-hover:text-[var(--color-accent)] transition-colors" style={{ color: "var(--color-text-primary)" }}>
                         {cap.title}
                       </h3>
                       <div className="text-[10px] mt-1 font-mono" style={{ color: "var(--color-text-muted)" }}>
                         {cap.artifactAnchor?.artifactVersion?.artifact?.filePath?.split("/").pop()}
                       </div>
                     </div>
-                    <span className="text-[10px] ml-3" style={{ color: "var(--color-text-muted)" }}>
+                    <span className="text-[10px] ml-3 font-mono" style={{ color: "var(--color-text-muted)" }}>
                       {new Date(cap.createdAt).toLocaleDateString()}
                     </span>
                   </div>
@@ -181,8 +186,8 @@ export default function ProfilePage() {
 
       {/* Knowledge Items */}
       <div>
-        <div className="text-[10px] uppercase tracking-widest font-mono mb-3" style={{ color: "var(--color-text-muted)" }}>
-          KNOWLEDGE YOU WROTE
+        <div className="eyebrow mb-3" style={{ color: "var(--color-text-muted)" }}>
+          Knowledge you wrote
         </div>
         {knowledgeItems.length === 0 ? (
           <div
@@ -194,38 +199,14 @@ export default function ProfilePage() {
             </p>
           </div>
         ) : (
-          <div className="space-y-2">
-            {knowledgeItems.map((item) => (
-              <Link
+          <div className="space-y-2.5">
+            {knowledgeItems.map((item, i) => (
+              <KnowledgeCard
                 key={item.id}
-                to="/knowledge"
-                className="block rounded-xl p-4 border transition-all hover:opacity-90"
-                style={{ backgroundColor: "var(--color-bg-card)", borderColor: "var(--color-border)" }}
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>📖</span>
-                  <h3 className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>
-                    {item.title}
-                  </h3>
-                </div>
-                <p className="text-xs line-clamp-1" style={{ color: "var(--color-text-secondary)" }}>
-                  {item.summary}
-                </p>
-                <div className="flex items-center gap-2 mt-2">
-                  {item.tags && item.tags.slice(0, 3).map((tag) => (
-                    <span
-                      key={tag}
-                      className="px-1.5 py-0.5 rounded text-[10px]"
-                      style={{ backgroundColor: "var(--color-bg-input)", color: "var(--color-text-muted)" }}
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                  <span className="text-[10px] ml-auto" style={{ color: "var(--color-text-muted)" }}>
-                    {Math.round(item.confidence * 100)}% confidence
-                  </span>
-                </div>
-              </Link>
+                item={item}
+                index={i}
+                onView={() => navigate("/knowledge")}
+              />
             ))}
           </div>
         )}
@@ -233,26 +214,27 @@ export default function ProfilePage() {
 
       {/* Workspaces */}
       <div>
-        <div className="text-[10px] uppercase tracking-widest font-mono mb-3" style={{ color: "var(--color-text-muted)" }}>
-          YOUR WORKSPACES
+        <div className="eyebrow mb-3" style={{ color: "var(--color-text-muted)" }}>
+          Your workspaces
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {workspaces.map((ws) => (
             <Link
               key={ws.id}
               to={`/workspaces/${ws.id}`}
-              className="rounded-xl p-4 border transition-all hover:opacity-90"
+              className="relative overflow-hidden rounded-xl p-4 pl-5 border transition-all hover:-translate-y-0.5 hover:shadow-lg group"
               style={{ backgroundColor: "var(--color-bg-card)", borderColor: "var(--color-border)" }}
             >
+              <span className="absolute left-0 top-0 bottom-0 w-[3px] opacity-0 group-hover:opacity-100 transition-opacity" style={{ backgroundColor: "var(--color-accent)" }} aria-hidden="true" />
               <div className="flex items-center gap-3">
                 <div
-                  className="w-9 h-9 rounded-lg flex items-center justify-center text-xs font-bold"
+                  className="w-9 h-9 rounded-lg flex items-center justify-center text-xs font-bold font-display"
                   style={{ backgroundColor: "var(--color-accent-dim)", color: "var(--color-accent)" }}
                 >
                   {ws.name.substring(0, 2).toUpperCase()}
                 </div>
                 <div>
-                  <h3 className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>
+                  <h3 className="text-sm font-semibold font-display group-hover:text-[var(--color-accent)] transition-colors" style={{ color: "var(--color-text-primary)" }}>
                     {ws.name}
                   </h3>
                   <div className="text-[10px] font-mono" style={{ color: "var(--color-text-muted)" }}>

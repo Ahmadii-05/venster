@@ -33,8 +33,12 @@ public class KnowledgeController {
 
     /**
      * Semantic search for knowledge items.
-     * When scope=global or no workspaceId: returns PUBLIC items as stripped DTO.
-     * When workspaceId is provided: workspace-scoped private search (existing behavior).
+     * <ul>
+     *   <li>{@code scope=mine}: search knowledge in workspaces the caller belongs
+     *       to, returned as stripped {@link PublicKnowledgeItem} DTOs.</li>
+     *   <li>{@code scope=global} or no workspaceId: PUBLIC items as stripped DTO.</li>
+     *   <li>workspaceId provided: workspace-scoped private search (existing behavior).</li>
+     * </ul>
      */
     @GetMapping("/search")
     public ResponseEntity<?> search(
@@ -45,6 +49,11 @@ public class KnowledgeController {
             @RequestParam(required = false) String tags,
             @RequestParam(required = false) String scope) {
         String email = currentEmail();
+
+        // "My workspaces" search: items the caller can access, stripped DTO.
+        if ("mine".equals(scope)) {
+            return ResponseEntity.ok(knowledgeService.searchMine(email, q, category, tags));
+        }
 
         // Global search: PUBLIC items only, return stripped DTO
         if ("global".equals(scope) || workspaceId == null) {
@@ -60,6 +69,40 @@ public class KnowledgeController {
         // Workspace-scoped search (existing behavior)
         ApiResponse<List<KnowledgeItem>> response = knowledgeService.search(
                 email, q, workspaceId, projectId, category, tags);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Browse the global library WITHOUT a search query: the most-recent PUBLIC
+     * items, so the Global Community landing view shows solved problems before
+     * the user types anything. Optional {@code category}/{@code tags} filters.
+     * Two-segment path avoids colliding with {@code GET /{id}}.
+     */
+    @GetMapping("/global/recent")
+    public ResponseEntity<ApiResponse<List<PublicKnowledgeItem>>> browseGlobalRecent(
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) String tags) {
+        return ResponseEntity.ok(knowledgeService.browseGlobalRecent(category, tags));
+    }
+
+    /**
+     * AI answer with citations: synthesize a direct, grounded answer to a
+     * natural-language question from the top matching knowledge entries.
+     * Body: {@code {"q": "...", "scope": "mine"|"global", "category": "...", "tags": "..."}}.
+     * Only {@code q} is required. {@code scope} defaults to global.
+     */
+    @PostMapping("/answer")
+    public ResponseEntity<ApiResponse<KnowledgeAnswer>> answer(@RequestBody Map<String, String> body) {
+        String email = currentEmail();
+        String q = body.get("q");
+        if (q == null || q.isBlank()) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("q is required"));
+        }
+        String scope = body.get("scope");
+        String category = body.get("category");
+        String tags = body.get("tags");
+        ApiResponse<KnowledgeAnswer> response =
+                knowledgeService.answerQuestion(email, q, scope, category, tags);
         return ResponseEntity.ok(response);
     }
 

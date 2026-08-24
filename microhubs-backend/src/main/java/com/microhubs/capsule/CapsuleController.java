@@ -31,14 +31,16 @@ public class CapsuleController {
             @RequestParam UUID projectId,
             @RequestParam(required = false) CapsuleStatus status,
             @RequestParam(required = false) UUID assigneeId) {
+        String email = currentEmail();
         ApiResponse<List<Capsule>> response =
-                capsuleService.listCapsules(projectId, status, assigneeId);
+                capsuleService.listCapsules(projectId, status, assigneeId, email);
         return ResponseEntity.ok(response);
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<Capsule>> getCapsule(@PathVariable UUID id) {
-        ApiResponse<Capsule> response = capsuleService.getCapsule(id);
+        String email = currentEmail();
+        ApiResponse<Capsule> response = capsuleService.getCapsule(id, email);
         return ResponseEntity.ok(response);
     }
 

@@ -102,7 +102,10 @@ public class WorkspaceService {
 
         Workspace workspace = getWorkspace(workspaceId);
         User requester = getUser(requesterEmail);
-        User user = getUser(email);
+        // The target is looked up by email; an unknown address is a client
+        // error (clean 400 "No such user found"), not a server fault (500).
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("No such user found"));
 
         WorkspaceMember requesterMembership =
                 getMembership(workspace, requester);
@@ -114,7 +117,7 @@ public class WorkspaceService {
         }
 
         if (isMember(workspace, user)) {
-            throw new IllegalStateException(
+            throw new IllegalArgumentException(
                     "User is already a member of this workspace"
             );
         }
@@ -222,6 +225,31 @@ public class WorkspaceService {
         }
 
         return getMembership(workspace, memberUser);
+    }
+
+    /**
+     * List all members of a workspace.
+     *
+     * Only members of the workspace can view the roster. Used by the
+     * frontend to populate the reviewer-assignment dropdown, so the
+     * caller can pick a real user (and we send that user's id) instead
+     * of free-typing an email that the backend can't resolve.
+     */
+    @Transactional(readOnly = true)
+    public List<WorkspaceMember> listMembers(
+            UUID workspaceId,
+            String requesterEmail) {
+
+        Workspace workspace = getWorkspace(workspaceId);
+        User requester = getUser(requesterEmail);
+
+        if (!isMember(workspace, requester)) {
+            throw new AccessDeniedException(
+                    "You are not a member of this workspace"
+            );
+        }
+
+        return workspaceMemberRepository.findByWorkspace(workspace);
     }
 
     private User getUser(String email) {

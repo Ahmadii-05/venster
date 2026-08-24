@@ -11,18 +11,20 @@ interface StatCardProps {
 export default function StatCard({ label, value, subtitle, color, icon }: StatCardProps) {
   return (
     <div
-      className="rounded-xl p-5 border transition-theme group hover:scale-[1.02]"
+      className="relative overflow-hidden rounded-xl py-5 pr-5 pl-6 border transition-theme group hover:-translate-y-0.5"
       style={{ backgroundColor: "var(--color-bg-card)", borderColor: "var(--color-border)" }}
     >
+      <span
+        className="absolute left-0 top-0 bottom-0 w-[3px]"
+        style={{ backgroundColor: color }}
+        aria-hidden="true"
+      />
       <div className="flex items-center justify-between mb-3">
-        <div
-          className="text-[10px] uppercase tracking-widest font-mono font-semibold"
-          style={{ color: "var(--color-text-muted)" }}
-        >
+        <div className="eyebrow" style={{ color: "var(--color-text-muted)" }}>
           {label}
         </div>
         {icon && (
-          <span className="opacity-30 group-hover:opacity-60 transition-opacity" style={{ color }}>
+          <span className="opacity-30 group-hover:opacity-70 transition-opacity" style={{ color }}>
             <Icon name={icon} size={20} />
           </span>
         )}

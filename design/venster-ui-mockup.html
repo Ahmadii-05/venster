@@ -1,0 +1,853 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Venster — UI/UX reskin mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;450;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+/* ============================================================
+   VENSTER — reskin mockup  (throwaway preview, not part of build)
+   Signature motif: the "IDE gutter" — every knowledge object is
+   framed like a line in a source file, with a colored margin that
+   encodes confidence/status. Honors the privacy model: global
+   community cards never fake a file path, they show index+confidence.
+   ============================================================ */
+
+:root{
+  /* dark — a tuned editor theme */
+  --bg:#0A0C10; --surface:#12151C; --surface-2:#161B24; --inset:#0E1116;
+  --input:#161B24; --line:#1F2430; --line-2:#2A313F;
+  --fg:#E6EDF3; --fg-dim:#8B949E; --fg-mute:#586173; --gutter:#3A4150;
+  --teal:#14B8A6; --teal-bright:#2DD4BF; --teal-dim:rgba(20,184,166,.14);
+  --violet:#A78BFA; --violet-dim:rgba(167,139,250,.14);
+  --sky:#38BDF8; --sky-dim:rgba(56,189,248,.14);
+  --amber:#FBBF24; --amber-dim:rgba(251,191,36,.14);
+  --green:#22C55E; --green-dim:rgba(34,197,94,.14);
+  --orange:#F97316; --red:#EF4444;
+  --shadow:0 1px 0 rgba(255,255,255,.02) inset, 0 12px 32px -12px rgba(0,0,0,.6);
+  --shadow-lg:0 24px 60px -20px rgba(0,0,0,.75);
+  --r-card:14px; --r-md:10px; --r-pill:999px;
+  --font-display:'Space Grotesk',system-ui,sans-serif;
+  --font-body:'Inter',system-ui,sans-serif;
+  --font-mono:'JetBrains Mono',ui-monospace,monospace;
+  --sidebar-w:244px;
+}
+[data-theme="light"]{
+  --bg:#F4F6F8; --surface:#FFFFFF; --surface-2:#FBFCFD; --inset:#EEF1F4;
+  --input:#F1F3F5; --line:#E3E7EB; --line-2:#D3D9DF;
+  --fg:#101418; --fg-dim:#4B5563; --fg-mute:#8A94A2; --gutter:#B4BCC6;
+  --teal:#0D9488; --teal-bright:#0F766E; --teal-dim:rgba(13,148,136,.12);
+  --violet:#7C3AED; --violet-dim:rgba(124,58,237,.10);
+  --sky:#0284C7; --sky-dim:rgba(2,132,199,.10);
+  --amber:#B45309; --amber-dim:rgba(180,83,9,.12);
+  --green:#16A34A; --green-dim:rgba(22,163,74,.12);
+  --orange:#EA580C; --red:#DC2626;
+  --shadow:0 1px 2px rgba(16,24,40,.04), 0 8px 24px -14px rgba(16,24,40,.22);
+  --shadow-lg:0 24px 60px -24px rgba(16,24,40,.28);
+}
+
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{
+  background:var(--bg); color:var(--fg);
+  font-family:var(--font-body); font-size:14px; line-height:1.5;
+  -webkit-font-smoothing:antialiased; letter-spacing:.005em;
+  transition:background .35s ease, color .35s ease;
+}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+::selection{background:var(--teal-dim);color:var(--fg)}
+.mono{font-family:var(--font-mono)}
+.eyebrow{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--teal);font-weight:600}
+h1,h2,h3{font-family:var(--font-display);font-weight:600;letter-spacing:-.01em;margin:0}
+
+/* scrollbar */
+*::-webkit-scrollbar{width:10px;height:10px}
+*::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:8px;border:3px solid transparent;background-clip:padding-box}
+*::-webkit-scrollbar-thumb:hover{background:var(--fg-mute)}
+
+/* ============================================================ LAYOUT */
+.app{display:grid;grid-template-columns:var(--sidebar-w) 1fr;min-height:100vh}
+
+/* --- SIDEBAR --- */
+.sidebar{
+  background:linear-gradient(180deg,var(--surface) 0%, var(--bg) 100%);
+  border-right:1px solid var(--line); padding:18px 14px; display:flex; flex-direction:column;
+  position:sticky; top:0; height:100vh;
+}
+.brand{display:flex;align-items:center;gap:11px;padding:6px 8px 18px}
+.brand .glyph{
+  width:34px;height:34px;border-radius:9px;flex:none;position:relative;
+  background:linear-gradient(135deg,var(--teal) 0%, #0E7C70 100%);
+  box-shadow:0 0 0 1px rgba(255,255,255,.06) inset, 0 6px 16px -6px var(--teal);
+  display:grid;place-items:center;
+}
+.brand .glyph::before{ /* the "window / venster" mark */
+  content:"";width:15px;height:15px;border:2px solid #04231F;border-radius:3px;
+  box-shadow:6px 6px 0 -4px #04231F;
+}
+.brand .name{font-family:var(--font-display);font-weight:700;font-size:16px;letter-spacing:-.01em}
+.brand .tag{font-family:var(--font-mono);font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--fg-mute);margin-top:1px}
+
+.nav{display:flex;flex-direction:column;gap:2px;margin-top:6px}
+.nav .label{font-family:var(--font-mono);font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--fg-mute);padding:14px 10px 6px}
+.nav a{
+  display:flex;align-items:center;gap:11px;padding:8.5px 10px;border-radius:9px;
+  color:var(--fg-dim);font-weight:500;font-size:13.5px;position:relative;
+  transition:background .15s ease,color .15s ease,transform .15s ease;
+}
+.nav a svg{width:17px;height:17px;flex:none;opacity:.85}
+.nav a .count{margin-left:auto;font-family:var(--font-mono);font-size:10.5px;color:var(--fg-mute);
+  background:var(--input);padding:1px 7px;border-radius:var(--r-pill)}
+.nav a:hover{background:var(--surface-2);color:var(--fg)}
+.nav a.active{background:var(--teal-dim);color:var(--teal-bright);font-weight:600}
+.nav a.active::before{content:"";position:absolute;left:-14px;top:8px;bottom:8px;width:3px;border-radius:0 3px 3px 0;background:var(--teal)}
+.nav a.active svg{opacity:1}
+.nav a.active .count{background:transparent;color:var(--teal-bright)}
+
+.side-foot{margin-top:auto;padding-top:14px;border-top:1px solid var(--line)}
+.side-user{display:flex;align-items:center;gap:10px;padding:8px;border-radius:10px;transition:background .15s}
+.side-user:hover{background:var(--surface-2)}
+.avatar{width:30px;height:30px;border-radius:50%;flex:none;display:grid;place-items:center;
+  font-family:var(--font-display);font-weight:600;font-size:12px;color:#04231F;
+  background:linear-gradient(135deg,var(--teal-bright),var(--violet))}
+.side-user .who{font-size:12.5px;font-weight:600;line-height:1.2}
+.side-user .role{font-size:10.5px;color:var(--fg-mute)}
+
+/* --- MAIN --- */
+.main{display:flex;flex-direction:column;min-width:0}
+.topbar{
+  height:58px;border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--bg) 82%, transparent);
+  backdrop-filter:blur(10px);position:sticky;top:0;z-index:20;
+  display:flex;align-items:center;gap:14px;padding:0 22px;
+}
+.searchbox{
+  flex:1;max-width:440px;display:flex;align-items:center;gap:9px;
+  background:var(--input);border:1px solid var(--line);border-radius:10px;padding:8px 12px;
+  font-family:var(--font-mono);font-size:12.5px;color:var(--fg-dim);transition:border .15s, box-shadow .15s;
+}
+.searchbox:focus-within{border-color:var(--teal);box-shadow:0 0 0 3px var(--teal-dim)}
+.searchbox .prompt{color:var(--teal);font-weight:600}
+.searchbox input{flex:1;background:none;border:none;outline:none;color:var(--fg);font-family:var(--font-mono);font-size:12.5px}
+.searchbox .kbd{font-family:var(--font-mono);font-size:10px;color:var(--fg-mute);border:1px solid var(--line-2);border-radius:5px;padding:1px 6px}
+.top-actions{margin-left:auto;display:flex;align-items:center;gap:10px}
+.icon-btn{width:36px;height:36px;border-radius:9px;display:grid;place-items:center;color:var(--fg-dim);border:1px solid transparent;transition:.15s;position:relative}
+.icon-btn:hover{background:var(--surface-2);color:var(--fg);border-color:var(--line)}
+.icon-btn svg{width:18px;height:18px}
+.icon-btn .dot{position:absolute;top:8px;right:9px;width:7px;height:7px;border-radius:50%;background:var(--amber);box-shadow:0 0 0 2px var(--bg)}
+.btn{
+  display:inline-flex;align-items:center;gap:7px;font-weight:600;font-size:13px;
+  padding:8.5px 15px;border-radius:9px;transition:.15s;white-space:nowrap;
+}
+.btn svg{width:15px;height:15px}
+.btn-primary{background:var(--teal);color:#04231F;box-shadow:0 8px 20px -10px var(--teal)}
+.btn-primary:hover{background:var(--teal-bright);transform:translateY(-1px)}
+.btn-ghost{border:1px solid var(--line-2);color:var(--fg-dim)}
+.btn-ghost:hover{color:var(--fg);border-color:var(--fg-mute);background:var(--surface-2)}
+
+.content{padding:30px 34px 64px;max-width:1180px;width:100%;margin:0 auto}
+.screen{display:none;animation:rise .4s cubic-bezier(.2,.7,.2,1)}
+.screen.on{display:block}
+@keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+/* page header */
+.phead{margin-bottom:22px;display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap}
+.phead h1{font-size:29px;line-height:1.1;margin-top:7px}
+.phead p{color:var(--fg-dim);font-size:13.5px;margin:7px 0 0;max-width:560px}
+
+/* ============================================================ THE SIGNATURE: gutter card */
+.gcard{
+  display:grid;grid-template-columns:52px 1fr;background:var(--surface);
+  border:1px solid var(--line);border-radius:var(--r-card);overflow:hidden;
+  transition:transform .16s ease, border-color .16s ease, box-shadow .16s ease;
+  position:relative;text-align:left;width:100%;
+}
+.gcard:hover{transform:translateY(-2px);border-color:var(--line-2);box-shadow:var(--shadow-lg)}
+.gcard .gutter{
+  background:var(--inset);border-right:1px solid var(--line);
+  display:flex;flex-direction:column;align-items:center;justify-content:flex-start;
+  padding:14px 0;gap:9px;position:relative;
+}
+.gcard .gutter::before{ /* the coverage/confidence margin bar */
+  content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--conf,var(--teal));
+}
+.gutter .ln{font-family:var(--font-mono);font-size:15px;font-weight:600;color:var(--gutter)}
+.gutter .glyph-sm{color:var(--fg-mute)}
+.gutter .glyph-sm svg{width:15px;height:15px;display:block}
+.gcard .body{padding:15px 17px 15px 16px}
+.gcard .row1{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:6px}
+.gcard h3{font-size:15.5px;font-weight:600}
+.gcard:hover h3{color:var(--teal-bright)}
+.gcard .summary{color:var(--fg-dim);font-size:13px;margin:0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.gcard .foot{display:flex;align-items:center;gap:8px;margin-top:11px;flex-wrap:wrap}
+
+/* badges + chips */
+.badge{font-family:var(--font-mono);font-size:10px;font-weight:600;letter-spacing:.04em;
+  padding:2.5px 8px;border-radius:var(--r-pill);text-transform:uppercase;white-space:nowrap}
+.b-public{background:var(--green-dim);color:var(--green)}
+.b-cat{background:var(--violet-dim);color:var(--violet)}
+.b-open{background:var(--sky-dim);color:var(--sky)}
+.b-review{background:var(--amber-dim);color:var(--amber)}
+.b-answered{background:var(--violet-dim);color:var(--violet)}
+.b-resolved{background:var(--green-dim);color:var(--green)}
+.tag{font-family:var(--font-mono);font-size:11px;color:var(--fg-dim);background:var(--input);
+  border:1px solid var(--line);padding:2px 8px;border-radius:6px}
+.tag:hover{border-color:var(--teal);color:var(--teal)}
+.conf{display:flex;align-items:center;gap:7px;margin-left:auto}
+.conf .track{width:64px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.conf .fill{height:100%;border-radius:3px}
+.conf .pct{font-family:var(--font-mono);font-size:11px;color:var(--fg-mute)}
+.link{color:var(--teal);font-weight:600;font-size:12.5px;font-family:var(--font-mono)}
+.link:hover{color:var(--teal-bright)}
+
+.stack{display:flex;flex-direction:column;gap:11px}
+.grid-2{display:grid;grid-template-columns:1.55fr 1fr;gap:22px}
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+@media(max-width:900px){.grid-2,.grid-3,.grid-4{grid-template-columns:1fr}}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-card);padding:18px}
+.panel h2{font-size:15px;display:flex;align-items:center;gap:9px}
+.panel .phint{color:var(--fg-mute);font-size:12px;margin:3px 0 15px}
+
+/* stat tiles */
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-card);padding:16px 17px;position:relative;overflow:hidden;transition:.16s}
+.stat:hover{border-color:var(--line-2);transform:translateY(-2px)}
+.stat .k{font-family:var(--font-mono);font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--fg-mute)}
+.stat .v{font-family:var(--font-display);font-size:30px;font-weight:600;line-height:1.05;margin-top:8px;letter-spacing:-.02em}
+.stat .d{font-size:11.5px;margin-top:5px;display:flex;align-items:center;gap:5px}
+.stat .up{color:var(--green)} .stat .down{color:var(--orange)}
+.stat .spark{position:absolute;right:-6px;bottom:-6px;opacity:.5}
+
+/* hero band on dashboard */
+.hero{
+  background:
+    radial-gradient(120% 140% at 100% 0%, var(--teal-dim) 0%, transparent 55%),
+    linear-gradient(180deg,var(--surface-2),var(--surface));
+  border:1px solid var(--line);border-radius:16px;padding:24px 26px;position:relative;overflow:hidden;
+}
+.hero .eyebrow{margin-bottom:9px}
+.hero .big{font-family:var(--font-display);font-size:26px;font-weight:600;letter-spacing:-.02em;line-height:1.25;max-width:640px}
+.hero .big em{font-style:normal;color:var(--teal-bright);
+  background:linear-gradient(180deg,transparent 62%,var(--teal-dim) 0);padding:0 3px}
+.hero .metrics{display:flex;gap:26px;margin-top:20px;flex-wrap:wrap}
+.hero .metrics .m .mv{font-family:var(--font-display);font-size:22px;font-weight:600}
+.hero .metrics .m .ml{font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--fg-mute);margin-top:2px}
+.hero .decor{position:absolute;right:22px;top:20px;font-family:var(--font-mono);font-size:11px;color:var(--fg-mute);opacity:.5;text-align:right;line-height:1.7;user-select:none}
+
+/* list rows (aging / hot files / notifications) */
+.rowlist{display:flex;flex-direction:column}
+.lrow{display:flex;align-items:center;gap:12px;padding:11px 6px;border-bottom:1px solid var(--line);transition:background .15s;border-radius:8px}
+.lrow:last-child{border-bottom:none}
+.lrow:hover{background:var(--surface-2)}
+.lrow .ln{font-family:var(--font-mono);font-size:11.5px;color:var(--gutter);width:22px;text-align:right;flex:none}
+.lrow .fp{font-family:var(--font-mono);font-size:12.5px;color:var(--fg);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lrow .meta{margin-left:auto;font-size:11.5px;color:var(--fg-mute);display:flex;align-items:center;gap:9px;flex:none}
+.pill-days{font-family:var(--font-mono);font-size:10.5px;padding:2px 8px;border-radius:var(--r-pill)}
+
+/* ============================================================ GLOBAL COMMUNITY detail (provenance rail) */
+.detail{display:grid;grid-template-columns:1fr 240px;gap:22px;align-items:start}
+@media(max-width:900px){.detail{grid-template-columns:1fr}}
+.doc{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-card);overflow:hidden}
+.doc .dhead{padding:22px 24px 18px;border-bottom:1px solid var(--line);
+  background:radial-gradient(100% 120% at 0 0,var(--teal-dim),transparent 60%)}
+.doc .dhead h1{font-size:23px;line-height:1.2}
+.doc .section{padding:18px 24px;border-bottom:1px solid var(--line)}
+.doc .section:last-child{border-bottom:none}
+.doc .section h3{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--teal);margin-bottom:8px}
+.doc .section p{color:var(--fg-dim);font-size:13.5px;margin:0}
+.doc .section.cause h3{color:var(--amber)}
+.doc .section.sol h3{color:var(--green)}
+.rail{position:sticky;top:78px;display:flex;flex-direction:column;gap:14px}
+.rail .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-card);padding:15px 16px}
+.rail .card h4{font-family:var(--font-mono);font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--fg-mute);margin:0 0 11px}
+.kv{display:flex;justify-content:space-between;align-items:center;font-size:12.5px;padding:5px 0}
+.kv span:first-child{color:var(--fg-mute)}
+.kv span:last-child{font-family:var(--font-mono);color:var(--fg)}
+.conf-big{display:flex;flex-direction:column;gap:8px}
+.conf-big .num{font-family:var(--font-display);font-size:32px;font-weight:600;color:var(--green)}
+.conf-big .track{height:7px;border-radius:4px;background:var(--line);overflow:hidden}
+.conf-big .fill{height:100%;background:var(--green);border-radius:4px}
+
+/* lifecycle track */
+.lifecycle{display:flex;align-items:center;gap:0;margin:2px 0}
+.lifecycle .seg{flex:1;height:5px;background:var(--line);position:relative}
+.lifecycle .seg:first-child{border-radius:4px 0 0 4px}
+.lifecycle .seg:last-child{border-radius:0 4px 4px 0}
+.lifecycle .seg.done{background:var(--teal)}
+.lifecycle .seg.cur{background:var(--teal-bright)}
+.lifecycle .seg.cur::after{content:"";position:absolute;right:-4px;top:-3px;width:11px;height:11px;border-radius:50%;
+  background:var(--teal-bright);box-shadow:0 0 0 3px var(--bg), 0 0 14px var(--teal-bright);animation:pulse 1.8s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
+.lifelabels{display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:9px;letter-spacing:.05em;text-transform:uppercase;color:var(--fg-mute);margin-top:7px}
+
+/* ============================================================ KNOWLEDGE / AI answer */
+.searchrow{display:flex;gap:10px;margin-bottom:16px}
+.searchrow .field{flex:1;display:flex;align-items:center;gap:10px;background:var(--input);border:1px solid var(--line);border-radius:11px;padding:11px 14px;font-family:var(--font-mono);font-size:13px}
+.searchrow .field:focus-within{border-color:var(--teal);box-shadow:0 0 0 3px var(--teal-dim)}
+.searchrow .field .prompt{color:var(--teal);font-weight:600}
+.searchrow .field input{flex:1;background:none;border:none;outline:none;color:var(--fg);font-family:var(--font-mono);font-size:13px}
+.scope{display:inline-flex;background:var(--input);border:1px solid var(--line);border-radius:9px;padding:3px}
+.scope button{font-family:var(--font-mono);font-size:11.5px;padding:6px 12px;border-radius:7px;color:var(--fg-dim);font-weight:600}
+.scope button.on{background:var(--teal);color:#04231F}
+.chips{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:18px}
+.chip{font-family:var(--font-mono);font-size:11.5px;color:var(--fg-dim);border:1px solid var(--line);padding:5px 11px;border-radius:var(--r-pill);transition:.15s}
+.chip:hover{border-color:var(--fg-mute);color:var(--fg)}
+.chip.on{background:var(--teal-dim);border-color:var(--teal);color:var(--teal-bright)}
+
+.answer{
+  background:linear-gradient(180deg,var(--violet-dim),transparent),var(--surface);
+  border:1px solid var(--line);border-left:3px solid var(--violet);border-radius:var(--r-card);
+  padding:20px 22px;margin-bottom:20px;position:relative;
+}
+.answer .aeyebrow{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--violet);font-weight:600;display:flex;align-items:center;gap:8px;margin-bottom:11px}
+.answer p{margin:0 0 12px;font-size:14px;color:var(--fg);line-height:1.65}
+.answer .cite{font-family:var(--font-mono);font-size:10.5px;font-weight:600;color:var(--violet);
+  background:var(--violet-dim);border-radius:5px;padding:0 5px;vertical-align:.5px;cursor:pointer}
+.answer .cite:hover{background:var(--violet);color:#fff}
+.answer .sources{border-top:1px solid var(--line);margin-top:6px;padding-top:13px;display:flex;flex-direction:column;gap:7px}
+.answer .src{display:flex;gap:10px;align-items:center;font-size:12.5px}
+.answer .src .n{font-family:var(--font-mono);font-size:10px;font-weight:600;color:var(--violet);background:var(--violet-dim);
+  width:19px;height:19px;border-radius:5px;display:grid;place-items:center;flex:none}
+.answer .src .t{color:var(--fg-dim)}
+.answer .src:hover .t{color:var(--teal)}
+
+/* workspaces */
+.wcard{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-card);padding:17px;transition:.16s;text-align:left;width:100%}
+.wcard:hover{border-color:var(--line-2);transform:translateY(-2px);box-shadow:var(--shadow-lg)}
+.wcard .tophat{display:flex;align-items:center;gap:11px;margin-bottom:13px}
+.wcard .wico{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;flex:none}
+.wcard h3{font-size:15px}
+.wcard .desc{color:var(--fg-dim);font-size:12.5px;margin:0 0 14px;min-height:34px}
+.wcard .stats{display:flex;gap:16px;border-top:1px solid var(--line);padding-top:12px}
+.wcard .stats .s .n{font-family:var(--font-display);font-size:17px;font-weight:600}
+.wcard .stats .s .l{font-family:var(--font-mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--fg-mute)}
+
+/* Q&A */
+.qrow{display:grid;grid-template-columns:64px 1fr;gap:16px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-card);padding:16px;transition:.16s}
+.qrow:hover{border-color:var(--line-2);transform:translateY(-2px)}
+.qstats{display:flex;flex-direction:column;gap:8px;align-items:center;padding-top:2px}
+.qstats .box{text-align:center}
+.qstats .box .n{font-family:var(--font-display);font-size:17px;font-weight:600;line-height:1}
+.qstats .box.answered .n{color:var(--green)}
+.qstats .box .l{font-family:var(--font-mono);font-size:8.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--fg-mute);margin-top:3px}
+.qrow h3{font-size:15px;margin-bottom:6px}
+.qrow:hover h3{color:var(--teal-bright)}
+.qrow .qmeta{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px;font-size:11.5px;color:var(--fg-mute)}
+
+/* notifications */
+.nrow{display:flex;gap:13px;padding:14px 15px;border:1px solid var(--line);border-radius:var(--r-card);background:var(--surface);margin-bottom:9px;transition:.15s;position:relative}
+.nrow:hover{border-color:var(--line-2);background:var(--surface-2)}
+.nrow.unread{border-left:3px solid var(--teal)}
+.nrow .nico{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;flex:none}
+.nrow .nbody .nt{font-size:13.5px;font-weight:500}
+.nrow .nbody .ns{font-size:12px;color:var(--fg-dim);margin-top:2px}
+.nrow .ntime{margin-left:auto;font-family:var(--font-mono);font-size:10.5px;color:var(--fg-mute);white-space:nowrap;flex:none}
+
+/* profile */
+.profhead{display:flex;gap:20px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:24px;margin-bottom:20px;
+  background-image:radial-gradient(120% 140% at 100% 0,var(--teal-dim),transparent 55%)}
+.profhead .big-av{width:76px;height:76px;border-radius:20px;display:grid;place-items:center;font-family:var(--font-display);font-weight:700;font-size:30px;color:#04231F;
+  background:linear-gradient(135deg,var(--teal-bright),var(--violet));flex:none}
+.profhead h1{font-size:24px}
+.profhead .sub{color:var(--fg-dim);font-size:13px;margin-top:4px}
+.profhead .badges{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+
+.section-title{display:flex;align-items:center;gap:9px;margin:26px 0 13px}
+.section-title h2{font-size:16px}
+.section-title .cnt{font-family:var(--font-mono);font-size:11px;color:var(--fg-mute);background:var(--input);padding:2px 9px;border-radius:var(--r-pill)}
+.section-title .spacer{flex:1}
+
+/* toast / note about mockup */
+.mock-note{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:60;
+  background:var(--surface-2);border:1px solid var(--line-2);border-radius:var(--r-pill);
+  padding:8px 16px;font-size:11.5px;color:var(--fg-dim);box-shadow:var(--shadow-lg);
+  font-family:var(--font-mono);letter-spacing:.02em;display:flex;align-items:center;gap:8px}
+.mock-note b{color:var(--teal-bright);font-weight:600}
+.mock-note button{color:var(--fg-mute);font-size:14px;line-height:1;padding:0 2px}
+
+@media (prefers-reduced-motion: reduce){
+  *{animation-duration:.001ms !important;transition-duration:.001ms !important}
+}
+</style>
+</head>
+<body data-theme="dark">
+
+<div class="app">
+  <!-- ================= SIDEBAR ================= -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="glyph"></div>
+      <div>
+        <div class="name">Venster</div>
+        <div class="tag">Capsule Workflow</div>
+      </div>
+    </div>
+
+    <nav class="nav">
+      <a href="#" class="active" data-screen="dashboard" onclick="go(event,'dashboard')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+        Dashboard
+      </a>
+      <a href="#" data-screen="workspaces" onclick="go(event,'workspaces')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 12l9 4 9-4M3 17l9 4 9-4"/></svg>
+        Workspaces <span class="count">4</span>
+      </a>
+      <a href="#" data-screen="knowledge" onclick="go(event,'knowledge')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v18H6.5A2.5 2.5 0 0 0 4 22.5z"/><path d="M9 7h7M9 11h5"/></svg>
+        Knowledge Base
+      </a>
+
+      <div class="label">Community</div>
+      <a href="#" data-screen="global" onclick="go(event,'global')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 2.5 15.4 0 18M12 3c-2.5 2.6-2.5 15.4 0 18"/></svg>
+        Global Community
+      </a>
+      <a href="#" data-screen="qa" onclick="go(event,'qa')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 0 1-2 2H8l-4 4V5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2z"/><path d="M9.5 9.5a2.5 2.5 0 0 1 4.7 1c0 1.6-2.2 1.9-2.2 3M12 15.5h.01"/></svg>
+        Community Q&amp;A <span class="count">12</span>
+      </a>
+
+      <div class="label">You</div>
+      <a href="#" data-screen="notifications" onclick="go(event,'notifications')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+        Notifications <span class="count" style="background:var(--amber-dim);color:var(--amber)">3</span>
+      </a>
+      <a href="#" data-screen="profile" onclick="go(event,'profile')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+        Profile
+      </a>
+    </nav>
+
+    <div class="side-foot">
+      <div class="side-user">
+        <div class="avatar">KR</div>
+        <div>
+          <div class="who">ksrre</div>
+          <div class="role">Backend · Platform</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ================= MAIN ================= -->
+  <div class="main">
+    <header class="topbar">
+      <div class="searchbox">
+        <span class="prompt">&gt;</span>
+        <input placeholder="search capsules, knowledge, files…" />
+        <span class="kbd">⌘K</span>
+      </div>
+      <div class="top-actions">
+        <button class="btn btn-primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>New Capsule</button>
+        <button class="icon-btn" title="Notifications" onclick="go(event,'notifications')"><span class="dot"></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"/></svg></button>
+        <button class="icon-btn" id="themeBtn" title="Toggle theme" onclick="toggleTheme()">
+          <svg id="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+        </button>
+        <div class="avatar" style="width:34px;height:34px">KR</div>
+      </div>
+    </header>
+
+    <main class="content">
+
+      <!-- ===================== DASHBOARD ===================== -->
+      <section class="screen on" id="dashboard">
+        <div class="hero">
+          <div class="decor">88&nbsp;&nbsp;→&nbsp;resolved<br/>89&nbsp;&nbsp;→&nbsp;answered<br/>90&nbsp;&nbsp;→&nbsp;open</div>
+          <div class="eyebrow">Workspace · Platform Core</div>
+          <div class="big">Your team has captured <em>142 answers</em> where the code lives — and kept <em>9 of them</em> from going stale this week.</div>
+          <div class="metrics">
+            <div class="m"><div class="mv">142</div><div class="ml">Knowledge items</div></div>
+            <div class="m"><div class="mv" style="color:var(--sky)">7</div><div class="ml">Open capsules</div></div>
+            <div class="m"><div class="mv" style="color:var(--amber)">3</div><div class="ml">Aging &gt; 5d</div></div>
+            <div class="m"><div class="mv" style="color:var(--green)">68%</div><div class="ml">Deflection rate</div></div>
+          </div>
+        </div>
+
+        <div class="grid-4" style="margin-top:16px">
+          <div class="stat"><div class="k">Capsules</div><div class="v">31</div><div class="d up">▲ 6 this week</div></div>
+          <div class="stat"><div class="k">Avg. resolve</div><div class="v">2.4<span style="font-size:15px;color:var(--fg-mute)">d</span></div><div class="d up">▼ 0.6d faster</div></div>
+          <div class="stat"><div class="k">Contributors</div><div class="v">9</div><div class="d" style="color:var(--fg-mute)">across 4 workspaces</div></div>
+          <div class="stat"><div class="k">Reused answers</div><div class="v">54</div><div class="d up">▲ 18 this month</div></div>
+        </div>
+
+        <div class="grid-2" style="margin-top:22px">
+          <div class="panel">
+            <h2><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg> Needs attention</h2>
+            <p class="phint">Capsules sitting in the same status too long — the knowledge is at risk of never being captured.</p>
+            <div class="rowlist">
+              <div class="lrow"><span class="ln">07</span><span class="fp">Race condition in WebSocket reconnect</span><span class="meta"><span class="badge b-review">in&nbsp;review</span><span class="pill-days" style="background:var(--amber-dim);color:var(--amber)">6d</span></span></div>
+              <div class="lrow"><span class="ln">04</span><span class="fp">Why is JWT refresh returning 401?</span><span class="meta"><span class="badge b-open">open</span><span class="pill-days" style="background:var(--orange);color:#fff">9d</span></span></div>
+              <div class="lrow"><span class="ln">02</span><span class="fp">Flyway migration order on fresh DB</span><span class="meta"><span class="badge b-answered">answered</span><span class="pill-days" style="background:var(--amber-dim);color:var(--amber)">5d</span></span></div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <h2><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--orange)" stroke-width="2"><path d="M12 2s6 5 6 11a6 6 0 0 1-12 0c0-2 1-3.5 1-3.5"/><path d="M12 22a4 4 0 0 0 4-4c0-2-2-3-4-6-2 3-4 4-4 6a4 4 0 0 0 4 4z"/></svg> Hot files</h2>
+            <p class="phint">Most-discussed source locations.</p>
+            <div class="rowlist">
+              <div class="lrow"><span class="ln">L88</span><span class="fp">AuthService.java</span><span class="meta">8 capsules</span></div>
+              <div class="lrow"><span class="ln">L23</span><span class="fp">useDashboard.ts</span><span class="meta">5 capsules</span></div>
+              <div class="lrow"><span class="ln">L41</span><span class="fp">KnowledgeService.java</span><span class="meta">4 capsules</span></div>
+              <div class="lrow"><span class="ln">L12</span><span class="fp">docker-compose.yml</span><span class="meta">3 capsules</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section-title"><h2>Recently captured</h2><span class="cnt">142</span><span class="spacer"></span><a href="#" class="link" onclick="go(event,'knowledge')">search all →</a></div>
+        <div class="stack" id="dashKnowledge"></div>
+      </section>
+
+      <!-- ===================== GLOBAL COMMUNITY ===================== -->
+      <section class="screen" id="global">
+        <!-- browse view -->
+        <div id="globalBrowse">
+          <div class="phead">
+            <div>
+              <div class="eyebrow">Community · Public library</div>
+              <h1>Global Community</h1>
+              <p>Solved problems shared publicly across every team. No workspace required — browse the wall, or search for a specific one.</p>
+            </div>
+          </div>
+
+          <div class="searchrow">
+            <div class="field"><span class="prompt">&gt;</span><input placeholder="how do I stop a React effect from looping…" /></div>
+            <button class="btn btn-primary">Search</button>
+          </div>
+          <div class="chips">
+            <button class="chip on">All</button>
+            <button class="chip">Concurrency</button>
+            <button class="chip">Database</button>
+            <button class="chip">Security</button>
+            <button class="chip">Frontend</button>
+            <button class="chip">DevOps</button>
+            <button class="chip">Testing</button>
+          </div>
+
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+            <span class="mono" style="font-size:11.5px;color:var(--fg-mute)">Recently shared by the community · 10</span>
+            <span class="mono" style="font-size:11.5px;color:var(--fg-mute)">sort: newest ↓</span>
+          </div>
+          <div class="stack" id="globalList"></div>
+        </div>
+
+        <!-- detail view -->
+        <div id="globalDetail" style="display:none">
+          <button class="link" style="margin-bottom:16px;display:inline-block" onclick="showBrowse()">← Back to browse</button>
+          <div class="detail">
+            <article class="doc">
+              <div class="dhead">
+                <div class="row1" style="display:flex;gap:9px;align-items:center;margin-bottom:10px">
+                  <span class="badge b-public">Public</span>
+                  <span class="badge b-cat">Frontend</span>
+                </div>
+                <h1>React effect fires in an infinite loop</h1>
+              </div>
+              <div class="section">
+                <h3>Summary</h3>
+                <p>A <span class="mono" style="color:var(--fg)">useEffect</span> that updates state it also depends on re-runs on every render, producing an infinite update loop and pegging the CPU. The fix is to correct the dependency array and derive state instead of mirroring it.</p>
+              </div>
+              <div class="section cause">
+                <h3>Root cause</h3>
+                <p>The effect wrote to a state value that was listed in (or implied by) its dependency array. Each write triggered a re-render, which re-ran the effect, which wrote again — an unterminated cycle. Object/array dependencies created inline also change identity every render, defeating referential equality.</p>
+              </div>
+              <div class="section sol">
+                <h3>Solution</h3>
+                <p>Remove the self-referential dependency and compute derived values during render (or with <span class="mono" style="color:var(--fg)">useMemo</span>) rather than storing them in state. When you must depend on an object, memoize it or depend on a primitive field. Use the functional <span class="mono" style="color:var(--fg)">setState(prev =&gt; …)</span> form so the effect no longer needs the current value as a dependency.</p>
+              </div>
+              <div class="section">
+                <h3>Tags</h3>
+                <div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:2px">
+                  <span class="tag">#React</span><span class="tag">#hooks</span><span class="tag">#useEffect</span><span class="tag">#TypeScript</span>
+                </div>
+              </div>
+            </article>
+
+            <aside class="rail">
+              <div class="card">
+                <h4>Confidence</h4>
+                <div class="conf-big">
+                  <span class="num">92%</span>
+                  <div class="track"><div class="fill" style="width:92%"></div></div>
+                  <span class="mono" style="font-size:11px;color:var(--fg-mute)">high · reused 11×</span>
+                </div>
+              </div>
+              <div class="card">
+                <h4>Provenance</h4>
+                <div class="kv"><span>Origin</span><span>Community</span></div>
+                <div class="kv"><span>Shared</span><span>Aug 2026</span></div>
+                <div class="kv"><span>Category</span><span>Frontend</span></div>
+                <div class="kv"><span>Visibility</span><span style="color:var(--green)">Public</span></div>
+                <p style="font-size:11px;color:var(--fg-mute);margin:11px 0 0;line-height:1.5">Public entries are stripped of file paths, code, and workspace — only the lesson travels.</p>
+              </div>
+              <div class="card">
+                <h4>Actions</h4>
+                <div class="stack" style="gap:8px">
+                  <button class="btn btn-ghost" style="width:100%;justify-content:center">Save to workspace</button>
+                  <button class="btn btn-ghost" style="width:100%;justify-content:center">Ask a follow-up</button>
+                </div>
+              </div>
+            </aside>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== KNOWLEDGE BASE (AI answer) ===================== -->
+      <section class="screen" id="knowledge">
+        <div class="phead">
+          <div>
+            <div class="eyebrow">Knowledge · Ask &amp; retrieve</div>
+            <h1>Knowledge Base</h1>
+            <p>Ask in plain language. Venster synthesizes an answer grounded in your team's captured knowledge — every claim is footnoted back to the capsule it came from.</p>
+          </div>
+          <div class="scope">
+            <button class="on">My workspaces</button>
+            <button>Global</button>
+          </div>
+        </div>
+
+        <div class="searchrow">
+          <div class="field"><span class="prompt">?</span><input value="Why does our JWT refresh sometimes return 401?" /></div>
+          <button class="btn btn-primary">Ask</button>
+        </div>
+        <div class="chips">
+          <button class="chip on">All categories</button>
+          <button class="chip">Security</button>
+          <button class="chip">Database</button>
+          <button class="chip">Concurrency</button>
+          <span style="flex:1"></span>
+          <button class="chip">sort: relevance ↓</button>
+        </div>
+
+        <div class="answer">
+          <div class="aeyebrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.4 6.9L21 11l-6.6 2.1L12 20l-2.4-6.9L3 11l6.6-2.1z"/></svg> Synthesized answer</div>
+          <p>A 401 on refresh usually means the refresh token is being validated against a <b>different signing secret</b> than the one that issued it — most often because <span class="mono" style="color:var(--fg)">JWT_SECRET</span> wasn't set, so the app fell back to a per-boot default and every restart invalidated existing tokens <span class="cite">[1]</span>. A second common cause is clock skew between services pushing the token just past <span class="mono" style="color:var(--fg)">exp</span> <span class="cite">[2]</span>.</p>
+          <p>Fix: pin a single <span class="mono" style="color:var(--fg)">JWT_SECRET</span> across every instance and environment, and verify the refresh endpoint reads it from config rather than regenerating one at startup <span class="cite">[1]</span>. Add a small leeway to expiry validation to absorb skew <span class="cite">[2]</span>.</p>
+          <div class="sources">
+            <div class="src"><span class="n">1</span><span class="t">JWT default secret regenerated on each boot → all tokens invalid after restart</span></div>
+            <div class="src"><span class="n">2</span><span class="t">Token expiry validation needs leeway for cross-service clock skew</span></div>
+          </div>
+        </div>
+
+        <div class="section-title"><h2>Matching entries</h2><span class="cnt">5</span></div>
+        <div class="stack" id="knowledgeList"></div>
+      </section>
+
+      <!-- ===================== WORKSPACES ===================== -->
+      <section class="screen" id="workspaces">
+        <div class="phead">
+          <div>
+            <div class="eyebrow">Org · Workspaces</div>
+            <h1>Workspaces</h1>
+            <p>Each workspace scopes its own projects, capsules, and private knowledge. Publish resolved capsules outward to the Global Community.</p>
+          </div>
+          <button class="btn btn-primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>New workspace</button>
+        </div>
+        <div class="grid-3" id="workspaceGrid"></div>
+      </section>
+
+      <!-- ===================== COMMUNITY Q&A ===================== -->
+      <section class="screen" id="qa">
+        <div class="phead">
+          <div>
+            <div class="eyebrow">Community · Questions</div>
+            <h1>Community Q&amp;A</h1>
+            <p>Cross-org questions that aren't tied to one file yet. Accepted answers can graduate into public knowledge.</p>
+          </div>
+          <button class="btn btn-primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>Ask a question</button>
+        </div>
+        <div class="chips">
+          <button class="chip on">All</button>
+          <button class="chip">Unanswered</button>
+          <button class="chip">#SpringBoot</button>
+          <button class="chip">#React</button>
+          <button class="chip">#Docker</button>
+          <button class="chip">#PostgreSQL</button>
+        </div>
+        <div class="stack" id="qaList"></div>
+      </section>
+
+      <!-- ===================== NOTIFICATIONS ===================== -->
+      <section class="screen" id="notifications">
+        <div class="phead">
+          <div>
+            <div class="eyebrow">You · Activity</div>
+            <h1>Notifications</h1>
+            <p>Mentions, status changes, and answers on the capsules you follow.</p>
+          </div>
+          <button class="btn btn-ghost">Mark all read</button>
+        </div>
+        <div id="notifList"></div>
+      </section>
+
+      <!-- ===================== PROFILE ===================== -->
+      <section class="screen" id="profile">
+        <div class="phead"><div><div class="eyebrow">You · Profile</div><h1 style="opacity:0;height:0;margin:0">Profile</h1></div></div>
+        <div class="profhead">
+          <div class="big-av">KR</div>
+          <div>
+            <h1>ksrre</h1>
+            <div class="sub">Backend · Platform Core · joined Feb 2026</div>
+            <div class="badges">
+              <span class="badge b-resolved">42 resolved</span>
+              <span class="badge b-cat">18 published</span>
+              <span class="badge" style="background:var(--teal-dim);color:var(--teal-bright)">Top contributor</span>
+            </div>
+          </div>
+        </div>
+        <div class="grid-4">
+          <div class="stat"><div class="k">Capsules opened</div><div class="v">57</div></div>
+          <div class="stat"><div class="k">Resolved</div><div class="v" style="color:var(--green)">42</div></div>
+          <div class="stat"><div class="k">Answers reused</div><div class="v">31</div></div>
+          <div class="stat"><div class="k">Reputation</div><div class="v" style="color:var(--teal-bright)">1.2k</div></div>
+        </div>
+
+        <div class="section-title"><h2>Your recent knowledge</h2><span class="cnt">3</span></div>
+        <div class="stack" id="profileList"></div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<div class="mock-note">
+  <span>Interactive mockup — <b>Venster</b> reskin · click the nav &amp; the <b>◐</b> theme toggle</span>
+  <button onclick="this.parentElement.remove()">✕</button>
+</div>
+
+<script>
+/* ---------- navigation ---------- */
+function go(e, id){
+  if(e) e.preventDefault();
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
+  const el = document.getElementById(id);
+  el.classList.add('on');
+  document.querySelectorAll('.nav a').forEach(a=>a.classList.toggle('active', a.dataset.screen===id));
+  if(id==='global') showBrowse();
+  document.querySelector('.content').scrollTo({top:0});
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+function showDetail(){document.getElementById('globalBrowse').style.display='none';document.getElementById('globalDetail').style.display='block';window.scrollTo({top:0,behavior:'smooth'})}
+function showBrowse(){document.getElementById('globalBrowse').style.display='block';document.getElementById('globalDetail').style.display='none'}
+
+/* ---------- theme ---------- */
+function toggleTheme(){
+  const b=document.body, next = b.getAttribute('data-theme')==='dark' ? 'light':'dark';
+  b.setAttribute('data-theme', next);
+  document.documentElement.setAttribute('data-theme', next);
+}
+
+/* ---------- data (real seed-set dev problems) ---------- */
+const conf = p => p>=80?'var(--green)': p>=50?'var(--amber)':'var(--sky)';
+
+const KNOW = [
+  {t:"Null pointer dereference on optional lookup", c:"Concurrency", cf:88, s:"An Optional was unwrapped with get() without checking presence, throwing NoSuchElement / NPE when the row was absent.", tags:["#Java","#NPE","#Optional"]},
+  {t:"React effect fires in an infinite loop", c:"Frontend", cf:92, s:"A useEffect updated state it also depended on, re-running every render. Fix the dependency array and derive instead of mirror.", tags:["#React","#hooks","#useEffect"]},
+  {t:"N+1 query blows up list endpoint latency", c:"Database", cf:85, s:"A lazy association was accessed inside a loop, issuing one query per row. Use a JOIN FETCH / batch size to load in one round-trip.", tags:["#JPA","#Hibernate","#PostgreSQL"]},
+  {t:"SQL injection via string-concatenated query", c:"Security", cf:96, s:"User input was concatenated straight into SQL. Switch to parameterized statements / bound query params — never build SQL by string.", tags:["#Security","#SQL","#OWASP"]},
+  {t:"bcrypt work factor set too low for prod", c:"Security", cf:81, s:"Password hashes used a cost of 4 for speed in tests and shipped to prod. Raise the strength and re-hash on next login.", tags:["#bcrypt","#auth","#Spring"]},
+  {t:"CORS preflight blocked on credentialed request", c:"Frontend", cf:78, s:"allowCredentials with a wildcard origin is rejected by browsers. List explicit origins and echo the request origin.", tags:["#CORS","#Spring","#browser"]},
+  {t:"Container can't reach db by localhost", c:"DevOps", cf:83, s:"Inside Compose, 'localhost' is the container itself. Use the service name as the host so DNS resolves to the db container.", tags:["#Docker","#networking","#compose"]},
+  {t:"Flaky async test fails 1 in 10 runs", c:"Testing", cf:74, s:"The test asserted before the async work settled. Await the completion / use awaitility rather than a fixed sleep.", tags:["#testing","#async","#flaky"]},
+  {t:"Lost update from concurrent edits", c:"Concurrency", cf:80, s:"Two writers read-modified-wrote the same row. Add an @Version column for optimistic locking, or SELECT … FOR UPDATE.", tags:["#locking","#JPA","#concurrency"]},
+  {t:"Wrong HTTP status hides client errors", c:"Backend", cf:69, s:"The API returned 200 with an error body, so clients never retried. Map validation to 400 and not-found to 404.", tags:["#HTTP","#REST","#API"]},
+];
+
+const gutterIcon = `<span class="glyph-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M8 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg></span>`;
+
+function knowCard(k, i){
+  return `<button class="gcard" style="--conf:${conf(k.cf)}" onclick="showDetail()">
+    <div class="gutter"><span class="ln">${String(i+1).padStart(2,'0')}</span>${gutterIcon}</div>
+    <div class="body">
+      <div class="row1">
+        <h3>${k.t}</h3>
+        <span class="badge b-cat">${k.c}</span>
+        <span class="badge b-public">Public</span>
+      </div>
+      <p class="summary">${k.s}</p>
+      <div class="foot">
+        ${k.tags.map(t=>`<span class="tag">${t}</span>`).join('')}
+        <span class="conf"><span class="track"><span class="fill" style="width:${k.cf}%;background:${conf(k.cf)}"></span></span><span class="pct">${k.cf}%</span></span>
+      </div>
+    </div>
+  </button>`;
+}
+
+/* global list (all 10) + dashboard/knowledge/profile subsets */
+document.getElementById('globalList').innerHTML   = KNOW.map(knowCard).join('');
+document.getElementById('dashKnowledge').innerHTML= KNOW.slice(0,4).map(knowCard).join('');
+document.getElementById('knowledgeList').innerHTML= [KNOW[4],KNOW[3],KNOW[0],KNOW[8],KNOW[9]].map(knowCard).join('');
+document.getElementById('profileList').innerHTML  = [KNOW[2],KNOW[6],KNOW[0]].map(knowCard).join('');
+
+/* workspaces */
+const WS = [
+  {n:"Platform Core", d:"Auth, gateway, shared libraries and the knowledge service itself.", proj:6, caps:31, kn:142, hue:"var(--teal)"},
+  {n:"Web App", d:"React 19 dashboard, design system and the VS Code extension.", proj:4, caps:18, kn:73, hue:"var(--violet)"},
+  {n:"Data & Search", d:"pgvector embeddings, retrieval pipeline and analytics jobs.", proj:3, caps:12, kn:54, hue:"var(--sky)"},
+  {n:"Infra", d:"Docker, CI/CD, observability and on-call runbooks.", proj:2, caps:9, kn:38, hue:"var(--amber)"},
+];
+document.getElementById('workspaceGrid').innerHTML = WS.map(w=>`
+  <button class="wcard">
+    <div class="tophat">
+      <div class="wico" style="background:color-mix(in srgb, ${w.hue} 16%, transparent);color:${w.hue}">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 12l9 4 9-4"/></svg>
+      </div>
+      <h3>${w.n}</h3>
+    </div>
+    <p class="desc">${w.d}</p>
+    <div class="stats">
+      <div class="s"><div class="n">${w.proj}</div><div class="l">Projects</div></div>
+      <div class="s"><div class="n">${w.caps}</div><div class="l">Capsules</div></div>
+      <div class="s"><div class="n">${w.kn}</div><div class="l">Knowledge</div></div>
+    </div>
+  </button>`).join('');
+
+/* Q&A */
+const QA = [
+  {t:"Best way to share a pgvector connection pool across async jobs?", v:14, a:3, ans:true, by:"maya · Data & Search", tags:["#PostgreSQL","#pgvector","#async"], time:"2h"},
+  {t:"Spring Security 6 — permitAll on a path still hits the JWT filter?", v:22, a:5, ans:true, by:"ksrre · Platform", tags:["#SpringBoot","#JWT","#security"], time:"5h"},
+  {t:"Vite build 3× slower after upgrading to React 19 — anyone else?", v:9, a:0, ans:false, by:"leo · Web App", tags:["#React","#Vite","#build"], time:"1d"},
+  {t:"How do you re-anchor a capsule when the file gets reformatted?", v:31, a:7, ans:true, by:"priya · Platform", tags:["#capsules","#anchoring","#git"], time:"2d"},
+];
+document.getElementById('qaList').innerHTML = QA.map(q=>`
+  <div class="qrow">
+    <div class="qstats">
+      <div class="box"><div class="n">${q.v}</div><div class="l">votes</div></div>
+      <div class="box ${q.ans?'answered':''}"><div class="n">${q.a}</div><div class="l">${q.ans?'✓ ans':'answers'}</div></div>
+    </div>
+    <div>
+      <h3>${q.t}</h3>
+      <div style="display:flex;gap:7px;flex-wrap:wrap">${q.tags.map(t=>`<span class="tag">${t}</span>`).join('')}</div>
+      <div class="qmeta"><span>asked by ${q.by}</span><span>·</span><span>${q.time} ago</span></div>
+    </div>
+  </div>`).join('');
+
+/* notifications */
+const NOTE = [
+  {i:"answer", u:1, t:"priya answered your capsule", s:"“Race condition in WebSocket reconnect” — proposed a fix using a reconnect token.", time:"12m", hue:"var(--violet)"},
+  {i:"mention", u:1, t:"leo mentioned you", s:"in Community Q&A: “@ksrre didn't you hit this with the JWT filter?”", time:"1h", hue:"var(--teal)"},
+  {i:"status", u:1, t:"Capsule moved to Resolved", s:"“N+1 query blows up list endpoint latency” was resolved and captured as knowledge.", time:"3h", hue:"var(--green)"},
+  {i:"stale", u:0, t:"Knowledge may be stale", s:"The source for “bcrypt work factor” changed — 2 commits since it was captured.", time:"1d", hue:"var(--amber)"},
+  {i:"publish", u:0, t:"Your knowledge went public", s:"“SQL injection via string-concatenated query” is now in the Global Community.", time:"2d", hue:"var(--sky)"},
+];
+const nIcon = {
+  answer:'<path d="M21 15a2 2 0 0 1-2 2H8l-4 4V5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2z"/>',
+  mention:'<circle cx="12" cy="12" r="4"/><path d="M16 12v1.5a2.5 2.5 0 0 0 5 0V12a9 9 0 1 0-3.5 7.1"/>',
+  status:'<path d="M20 6 9 17l-5-5"/>',
+  stale:'<path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>',
+  publish:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 2.5 15.4 0 18"/>'
+};
+document.getElementById('notifList').innerHTML = NOTE.map(n=>`
+  <div class="nrow ${n.u?'unread':''}">
+    <div class="nico" style="background:color-mix(in srgb, ${n.hue} 15%, transparent);color:${n.hue}">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9">${nIcon[n.i]}</svg>
+    </div>
+    <div class="nbody"><div class="nt">${n.t}</div><div class="ns">${n.s}</div></div>
+    <div class="ntime">${n.time}</div>
+  </div>`).join('');
+</script>
+</body>
+</html>

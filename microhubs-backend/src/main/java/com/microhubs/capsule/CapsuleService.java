@@ -5,9 +5,13 @@ import com.microhubs.artifact.ArtifactAnchorRepository;
 import com.microhubs.auth.User;
 import com.microhubs.auth.UserRepository;
 import com.microhubs.common.ApiResponse;
+import com.microhubs.project.Project;
+import com.microhubs.project.ProjectRepository;
 import com.microhubs.workspace.Workspace;
 import com.microhubs.notification.NotificationService;
 import com.microhubs.workspace.WorkspaceMemberRepository;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -29,6 +33,10 @@ public class CapsuleService {
     private WorkspaceMemberRepository workspaceMemberRepository;
     @Autowired
     private NotificationService notificationService;
+    @Autowired
+    private ProjectRepository projectRepository;
+    @Autowired
+    private ObjectMapper objectMapper;
 
     /**
      * Explicit allowed-status transitions.
@@ -83,7 +91,12 @@ public class CapsuleService {
      */
     @Transactional(readOnly = true)
     public ApiResponse<List<Capsule>> listCapsules(
-            UUID projectId, CapsuleStatus status, UUID assigneeId) {
+            UUID projectId, CapsuleStatus status, UUID assigneeId, String email) {
+        User user = getUser(email);
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new RuntimeException("Project not found"));
+        verifyWorkspaceMembership(project.getWorkspace(), user);
+
         List<Capsule> capsules;
         String statusName = status != null ? status.name() : null;
         if (statusName != null && assigneeId != null) {
@@ -105,8 +118,10 @@ public class CapsuleService {
      * Get a single capsule by ID.
      */
     @Transactional(readOnly = true)
-    public ApiResponse<Capsule> getCapsule(UUID capsuleId) {
+    public ApiResponse<Capsule> getCapsule(UUID capsuleId, String email) {
+        User user = getUser(email);
         Capsule capsule = getCapsuleById(capsuleId);
+        verifyWorkspaceMembership(workspaceOf(capsule), user);
         return ApiResponse.success(capsule);
     }
 
@@ -117,6 +132,7 @@ public class CapsuleService {
             UUID capsuleId, String email, CapsuleUpdateRequest request) {
         User user = getUser(email);
         Capsule capsule = getCapsuleById(capsuleId);
+        verifyWorkspaceMembership(workspaceOf(capsule), user);
 
         // Status transition enforcement
         if (request.getStatus() != null) {
@@ -140,13 +156,17 @@ public class CapsuleService {
         // Reviewer assignment
         if (request.getReviewerId() != null) {
             User reviewer = userRepository.findById(request.getReviewerId())
-                    .orElseThrow(() -> new RuntimeException("Reviewer not found"));
+                    .orElseThrow(() -> new IllegalArgumentException("No such user found"));
+            // Reviewer must belong to the same workspace as the capsule
+            verifyWorkspaceMembership(workspaceOf(capsule), reviewer);
             capsule.setReviewer(reviewer);
             // Notify the assigned reviewer
             notificationService.notify(
                     reviewer.getId(),
                     "CAPSULE_ASSIGNED",
-                    "{\"capsuleId\":\"" + capsule.getId() + "\",\"title\":\"" + capsule.getTitle() + "\"}");
+                    toJson(Map.of(
+                            "capsuleId", capsule.getId().toString(),
+                            "title", capsule.getTitle())));
         }
 
         // Priority update
@@ -193,6 +213,24 @@ public class CapsuleService {
     private Capsule getCapsuleById(UUID id) {
         return capsuleRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Capsule not found"));
+    }
+
+    /** Resolve the owning workspace by walking the anchor → version → artifact → project chain. */
+    private Workspace workspaceOf(Capsule capsule) {
+        return capsule.getArtifactAnchor()
+                .getArtifactVersion()
+                .getArtifact()
+                .getProject()
+                .getWorkspace();
+    }
+
+    /** Serialize a map to a JSON string safely (prevents injection via user-controlled values). */
+    private String toJson(Map<String, Object> data) {
+        try {
+            return objectMapper.writeValueAsString(data);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException("Failed to serialize notification context", e);
+        }
     }
 
     private void verifyWorkspaceMembership(Workspace workspace, User user) {

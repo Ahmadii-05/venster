@@ -46,6 +46,9 @@ import static org.mockito.Mockito.*;
         properties = {
                 "spring.jpa.hibernate.ddl-auto=none",
                 "jwt.secret=test-secret-key-for-integration-tests-32chars",
+                // Don't seed the global library during tests: the suite truncates
+                // knowledge_items and mocks the embedder, so seeding would be noise.
+                "seed.global-knowledge=false",
                 // Default to docker-compose PostgreSQL; overridden by Testcontainers if available
                 "spring.datasource.url=jdbc:postgresql://localhost:5433/microhubs?stringtype=unspecified",
                 "spring.datasource.username=microhubs",

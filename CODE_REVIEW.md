@@ -28,6 +28,26 @@ None of this is unusual for a hackathon MVP, and the good news is that the two c
 | **Medium** | ~16 | Async/transaction race; no LLM timeouts; JSON injection; broken delete cascades; Docker/compose gaps; email lost on refresh; webview CSP |
 | **Low** | ~25 | Dead code, validation gaps, accessibility, CI hardening, duplication |
 
+### Remediation status — follow-up pass (2026-08-23)
+
+A remediation pass after the initial review fixed **both Critical findings and most of the High cluster** (scoped deliberately to Critical + High). Backend edits are code-verified by read-back (the backend cannot be compiled in the review sandbox — no Maven/Docker); the **frontend type-checks clean** (`tsc -b --force` exits 0). Two things still need the author's machine: run `mvn test` for the backend, and boot the full stack once from an empty volume to confirm C2 end-to-end.
+
+| ID | Finding | Status |
+|----|---------|--------|
+| C1 | Capsule IDOR (read + write) | ✅ Fixed — membership check on `getCapsule`/`listCapsules`/`updateCapsule` + reviewer validation |
+| C2 | Clean deploy fails to boot (schema/entity mismatch) | ✅ Fixed — `schema.sql` rewritten to the full entity set; Flyway still recommended long-term |
+| H1 | Publicly-known default JWT secret | ✅ Fixed — default removed, fail-fast on unset/weak secret |
+| H2 | Comment/resolution IDOR reads | ✅ Fixed — same membership check as the write paths |
+| H3 | JWT in `localStorage` | ◐ Hardened — persisted surface minimized + dead code removed; httpOnly-cookie migration deferred (documented) |
+| H4 | Frontend build break (`ws` scope) | ✅ Fixed — `ws` hoisted; `tsc -b` now passes |
+| H5 | No DB indexes / no vector ANN index | ✅ Fixed — FK/lookup btree indexes + HNSW `vector_cosine_ops` |
+| H6 | Dead `backend/` folder | ✅ Removed — deleted from the tree (rotate its historical secrets) |
+| H7 | Committed build artifacts | ◐ `.gitignore` extended + `.gitattributes` added; `git rm --cached` pending (commands supplied) |
+| M4 | JSON injection into notification context | ✅ Fixed — payload built with Jackson |
+| M17 | `request()` parses JSON unconditionally | ◐ Fixed in web frontend; the VS Code extension mirror is still open |
+
+Everything else (remaining Medium/Low) is unchanged and open by design. Individual findings below carry an inline **Status** line where addressed.
+
 ---
 
 ## Critical
@@ -43,6 +63,8 @@ The service has a `verifyWorkspaceMembership(...)` helper (line 198) and `create
 
 **Fix:** In all three methods, resolve the capsule's workspace via the anchor chain (`anchor.getArtifactVersion().getArtifact().getProject().getWorkspace()`, exactly as `createCapsule` does) and call `verifyWorkspaceMembership(workspace, user)` before returning or mutating. Validate that any supplied `reviewerId` is a member of that workspace. Consider returning a DTO that omits `selectedText` and the full user/workspace graph. This same one-line-per-method omission is the root of findings H2 and H3 below — fixing the pattern closes the entire IDOR cluster.
 
+**Status (2026-08-23): ✅ Fixed.** `getCapsule`, `listCapsules`, and `updateCapsule` now resolve the workspace via the anchor chain (new `workspaceOf(capsule)` helper) and call `verifyWorkspaceMembership` before returning or mutating; the reviewer-assignment branch validates the `reviewerId` is a member of the same workspace. The DTO-shaping suggestion (omitting `selectedText`/full graph) is not yet done — a sensible defense-in-depth follow-up.
+
 ### [C2] The stack cannot boot from a clean `docker compose up` (entity/schema mismatch)
 **Where:** `microhubs-backend/src/main/resources/application.yml:12` (`ddl-auto: validate`); `docker-compose.yml:10` (mounts only `schema.sql` as the DB init script); `microhubs-backend/database/schema.sql` (the "Phase 0" schema); entities `knowledge/KnowledgeItem.java:62,67,70,74`, `auth/User.java:23`, `globalqa/GlobalQuestion.java:11`, `globalqa/GlobalAnswer.java:9`, `globalqa/GlobalReport.java:8`
 
@@ -56,6 +78,8 @@ The `V2__add_knowledge_visibility.sql` migration that would add most of these is
 
 **Fix:** Establish one authoritative schema. Preferred: add Flyway (`spring-boot-starter` + `flyway-core`), move a complete `V1__init.sql` (superset of the current test schema, including `global_answer_id`) plus `V2…` into `src/main/resources/db/migration`, and let Flyway own creation at startup. Then delete the divergent hand-maintained `schema.sql`/`schema-test.sql`. Verify by booting the full stack from an empty volume — not just by running tests.
 
+**Status (2026-08-23): ✅ Fixed (interim).** `microhubs-backend/database/schema.sql` (the compose-mounted init script) has been rewritten to the full, entity-accurate schema — it now mirrors `schema-test.sql` (all 16 tables incl. `platform_moderator`, the knowledge visibility columns, and the `global_*` tables) so `ddl-auto: validate` passes on a clean boot. `knowledge_items.resolution_id` is `UUID UNIQUE` (nullable) to match the entity. Flyway was **not** adopted — the two hand-maintained schemas still coexist (now aligned), so the "single source of truth" recommendation stands as a follow-up. Verify by booting from an empty volume before relying on it.
+
 ---
 
 ## High
@@ -67,12 +91,16 @@ The HMAC key falls back to the literal string `default-secret-change-in-producti
 
 **Fix:** Remove the default entirely and fail fast at startup if `JWT_SECRET` is unset. Require a random 256-bit+ secret per environment. (Also: `JwtUtil.java:6` imports `Decoders` but never base64-decodes the key, and `getBytes()` uses the platform default charset — minor, but decode a base64 secret explicitly.)
 
+**Status (2026-08-23): ✅ Fixed.** `application.yml` now uses `${JWT_SECRET}` with no default; `docker-compose.yml` uses `${JWT_SECRET:?…}` so compose aborts if it is unset. `JwtUtil` gained a `@PostConstruct` check that throws if the secret is missing or under 32 bytes, and `getSigningKey()`/token signing now use an explicit `StandardCharsets.UTF_8` (no platform-default charset). Note: the local `.env` placeholder should still be replaced with a real random secret, and the CI integration test sets its own 45-char test secret so it is unaffected.
+
 ### [H2] IDOR read on comments and resolutions
 **Where:** `discussion/DiscussionService.java:84` (`listComments`); `resolution/ResolutionService.java:102` (`getResolution`)
 
 Same class of bug as C1. `listComments` returns a capsule's full discussion thread with no membership check (even though its sibling `postComment` correctly calls `verifyWorkspaceMembership`). `getResolution` returns the resolution `finalSolution` for any capsule ID, while the resolve/write path is properly guarded. Any authenticated user can read any discussion or resolution.
 
 **Fix:** Apply the same `verifyWorkspaceMembership` check used on the corresponding write paths.
+
+**Status (2026-08-23): ✅ Fixed.** `DiscussionService.listComments` now loads the capsule and calls `verifyWorkspaceMembership` before returning the thread; `ResolutionService.getResolution` gained a member-any-role `verifyWorkspaceMembership(capsule, user)` check (mirroring the resolve-write path). Both controllers now pass the caller's email through.
 
 ### [H3] Web frontend stores the JWT in `localStorage`
 **Where:** `frontend/src/services/api.ts:24,37`
@@ -81,12 +109,16 @@ The token is persisted to `localStorage`. Any script running in the origin — a
 
 **Fix:** Prefer an `httpOnly; Secure; SameSite` cookie set by the backend. If it must stay client-side, keep it in memory only and add token-expiry handling. (The XSS *surface* is currently small — see positives — but this remains the highest-value client-side hardening item.)
 
+**Status (2026-08-23): ◐ Partially hardened.** The token still lives in `localStorage` (the full fix is an httpOnly cookie, a coordinated backend+frontend change, deferred and documented inline in `api.ts`). This pass minimized the persisted surface: the dead `getStoredUser`/`_user` state and the redundant `localStorage["user"]` write were removed (`setAuthToken` now stores only the token), and a `SECURITY NOTE` documents the cookie migration. The module-load `JSON.parse` that could brick app boot on corrupted storage is gone as a side effect.
+
 ### [H4] Frontend production build is broken (variable out of scope)
 **Where:** `frontend/src/pages/DashboardPage.tsx:74` vs `:125`
 
 `const ws` is declared inside the `try` block that closes at line 119; it is then referenced at line 125 (`if (ws && ws.length > 0)`), outside that block. `const` is block-scoped, so this is a TypeScript compile error (`TS2304: Cannot find name 'ws'`) — `npm run build` (`tsc -b && vite build`) fails. In `vite dev` (no type-check) it throws a runtime `ReferenceError`, so the Knowledge-Health panel silently never renders. (`ProfilePage.tsx:42` uses the same pattern correctly, inside its try block.)
 
 **Fix:** Hoist `let ws` above the `try`, or move the knowledge-health block inside it.
+
+**Status (2026-08-23): ✅ Fixed.** `ws` is now declared as `let ws: Workspace[] = []` at the function scope above the `try` (so the non-blocking knowledge-health fetch after the `finally` can read it). `npm run build`'s type-check step (`tsc -b --force`) now exits 0. (The subsequent `vite build` fails in the review sandbox only because `node_modules` was installed on Windows and the Linux `rolldown` native binary is absent — not a code issue.)
 
 ### [H5] No database indexes anywhere — including no vector ANN index
 **Where:** `microhubs-backend/database/schema.sql` (no `CREATE INDEX` in any SQL file)
@@ -95,12 +127,16 @@ The token is persisted to `localStorage`. Any script running in the origin — a
 
 **Fix:** Add an ANN index matching the query's distance operator, e.g. `CREATE INDEX ON knowledge_items USING hnsw (embedding vector_cosine_ops);`, plus btree indexes on every FK column and hot filters (`capsules.status`, `knowledge_items.visibility`).
 
+**Status (2026-08-23): ✅ Fixed.** The rewritten `schema.sql` adds an HNSW index `USING hnsw (embedding vector_cosine_ops)` — `vector_cosine_ops` was chosen because `KnowledgeRepository`'s similarity queries order by the cosine-distance operator `<=>`. It also adds btree indexes on the FK/lookup columns (`workspace_members`, `projects.workspace_id`, the artifact chain, `capsules.*`, `comments.*`, `notifications(user_id, read)`, the `global_*` tables, `audit_log`) and hot filters (`capsules.status`, `knowledge_items.visibility`/`category`).
+
 ### [H6] Dead `backend/` folder committed — with hardcoded credentials in history
 **Where:** `backend/` (a full, obsolete duplicate of the backend); secrets at `backend/src/main/resources/application.yml:8` (DB password `041410`) and `:22` (hardcoded JWT secret)
 
 `backend/` is an abandoned earlier copy (30 source files, the pre-knowledge subset, port 8083, `ddl-auto: update`, no pgvector dependency). It is not built by compose and not referenced anywhere in the README — pure dead code. It also commits a personal DB password and a hardcoded JWT secret into git history, and it invites edits to the wrong tree.
 
 **Fix:** `git rm -r backend/` and commit. Rotate `041410` and that JWT secret if either is reused in any real environment (git history retains them). See H7 for the broader hygiene cleanup.
+
+**Status (2026-08-23): ✅ Removed.** The `backend/` folder has been deleted from the working tree and is no longer tracked (`git ls-files` reports 0 files under `backend/`); `/backend/` was also added to `.gitignore` to prevent it returning. ⚠️ The DB password `041410` and the hardcoded JWT secret still exist in **git history** — rotate both if they were ever used in a real environment, since deletion does not purge history.
 
 ---
 
@@ -111,7 +147,7 @@ Backend / correctness:
 - **[M1] Async knowledge extraction races the resolving transaction.** `knowledge/KnowledgeService.java:60` listener is `@Async` but the event is published inside the still-open resolve transaction (`resolution/ResolutionService.java:87`). The async thread reloads the resolution and typically can't see the uncommitted row → "Resolution not found", swallowed and logged → knowledge silently never generated. **Fix:** `@TransactionalEventListener(phase = AFTER_COMMIT)` + `@Async`.
 - **[M2] `@Async` self-invocation is a no-op.** `globalqa/GlobalQAService.java:212` is called via `this.` from `acceptAnswer` (line 127), bypassing the Spring proxy — so the slow LLM call runs synchronously on the HTTP thread and blocks the response. **Fix:** move it to a separate bean or trigger via an event.
 - **[M3] LLM HTTP client has no timeouts.** `knowledge/OpenAiLlmClient.java:27,83` — no connect or request timeout. A stalled Groq call hangs indefinitely and can exhaust the small async pool (`application.yml:18`, max 4). **Fix:** set `connectTimeout` and per-request `timeout`.
-- **[M4] JSON injection into notification context.** `capsule/CapsuleService.java:149` builds JSONB by string-concatenating the user-controlled capsule title. A `"` in a title breaks the JSON (500s on reviewer assignment); a crafted title injects arbitrary keys the frontend later renders. **Fix:** build the payload with Jackson.
+- **[M4] JSON injection into notification context.** `capsule/CapsuleService.java:149` builds JSONB by string-concatenating the user-controlled capsule title. A `"` in a title breaks the JSON (500s on reviewer assignment); a crafted title injects arbitrary keys the frontend later renders. **Fix:** build the payload with Jackson. **✅ Fixed (2026-08-23):** the reviewer-assignment notification context is now serialized with a Jackson `ObjectMapper` (`toJson(Map.of("capsuleId", …, "title", …))`), so titles are safely escaped.
 - **[M5] Error handler leaks internals + wrong status codes.** `common/GlobalExceptionHandler.java:67` returns `"…" + ex.getMessage()` as HTTP 500; expected "not found" cases are thrown as bare `RuntimeException`, so legitimate 404s surface as 500s echoing internal messages. `show-sql: true` (`application.yml:13`) is also on. **Fix:** typed `NotFoundException → 404`, don't reflect raw messages, disable SQL logging outside dev.
 - **[M6] Prompt injection + unmoderated auto-PUBLIC knowledge.** User text is concatenated into the LLM prompt (`knowledge/OpenAiLlmClient.java:44`). `category` is not validated against its enum (`KnowledgeService` `validateLlmResponse` checks presence only), and accepted global answers are written `visibility = PUBLIC` with `approved = false` (`globalqa/GlobalQAService.java:271`). `SecretRedactor` is correctly applied first but is regex-based and doesn't redact author names/PII. **Fix:** enforce the enum, keep auto-generated items non-public until moderated, delimit untrusted context.
 - **[M7] Broken delete cascades.** `schema.sql:72` — `capsules.artifact_anchor_id` references `artifact_anchors` with no `ON DELETE`, while the whole workspace→anchor chain cascades. Deleting a workspace/project cascades down to the anchor, then is blocked by any capsule → the entire delete fails. **Fix:** make the FK lifecycle consistent (e.g. `ON DELETE CASCADE`) or adopt soft-deletes.
@@ -130,7 +166,7 @@ Frontend / extension:
 - **[M14] User email lost on refresh → breaks permission-gated UI.** `frontend/src/context/AuthContext.tsx:17` restores the token but initializes `email` to `null`; `getStoredUser()` (`api.ts:48`) exists but is never called. After a hard refresh, `isReviewer`/`canResolve`/the ADMIN publish toggle (`CapsuleDetailPage.tsx:74`) and `isAuthor` checks (`GlobalQAPage.tsx:260`) silently fail. **Fix:** initialize `email` from `getStoredUser()` or decode the JWT.
 - **[M15] Extension webview: no CSP + several unescaped fields.** `vscode-extension/src/extension.ts` builds raw HTML with no CSP/nonce; author name/email (`:195,208,211`), knowledge `category` (`:368`), `tags` (`:376`), `status`/`priority` (`:207`) are interpolated unescaped. `enableScripts:false` blocks JS execution (so impact is limited to HTML injection / remote image loads / phishing), but the missing CSP is an anti-pattern. **Fix:** add a strict CSP meta tag and run every interpolated value through `escapeHtml`.
 - **[M16] Uncancelled recursive knowledge poll.** `frontend/src/pages/CapsuleDetailPage.tsx:50` re-schedules `setTimeout` up to 10× at 3s; the id is never stored and the effect (`:89`) has no cleanup → setState-after-unmount and overlapping polls. **Fix:** store the timeout id in a ref, clear it on cleanup.
-- **[M17] `request()` parses JSON unconditionally.** `frontend/src/services/api.ts:77` (mirrored in the extension `api.ts:106`) always calls `res.json()`, throwing on `204`/empty/HTML responses (e.g. `notificationApi.markAsRead`, the report/hide endpoints, backend 500 pages). **Fix:** guard on status/`content-type`, fall back to `res.text()`.
+- **[M17] `request()` parses JSON unconditionally.** `frontend/src/services/api.ts:77` (mirrored in the extension `api.ts:106`) always calls `res.json()`, throwing on `204`/empty/HTML responses (e.g. `notificationApi.markAsRead`, the report/hide endpoints, backend 500 pages). **Fix:** guard on status/`content-type`, fall back to `res.text()`. **◐ Fixed in web frontend (2026-08-23):** `request()` now reads `res.text()` first, returns `undefined` for empty bodies (e.g. `204`), and throws a clear status-carrying error on non-JSON responses instead of an opaque parse error. The VS Code extension's mirrored `api.ts` was out of scope and is still open.
 - **[M18] Extension 401 doesn't clear the stored token.** `vscode-extension/src/api.ts:98` nulls the in-memory token but leaves `microhubs.token` in SecretStorage, so the next activation restores the expired token and the 30s poller keeps hitting the API with it. **Fix:** delete the secret and stop the poller on 401.
 
 ---
@@ -147,7 +183,9 @@ Grouped for brevity; each is a small, isolated cleanup.
 
 **Infra / CI:** no explicit `permissions:` block in `ci.yml` (defaults to read-write `GITHUB_TOKEN`); actions pinned by tag not SHA, and a privileged docker-in-docker service; `modernize` hook script builds a file path from untrusted stdin `session_id` with no sanitizing and no `set -euo pipefail` (`.github/modernize/.../recordToolUse.sh:19`); nginx serves no security headers (`frontend/nginx.conf`); frontend Dockerfile uses `npm install` instead of `npm ci`; stale untracked duplicate frontend inside `microhubs-backend/frontend/`; dead `audit_log` table (`schema.sql:123`) with no entity or code reference.
 
-**[H7 / hygiene] Committed build artifacts dominate the repo.** ~576 of 769 tracked files are junk: 414 under `jar-check/`, 279 `.class`, 42 under `target/`, 112 under `src_backup/` (a doubly-nested backup-of-a-backup), 8 under `vscode-extension/out/`. `.gitignore` lists `target/`/`*.class`/`*.jar` but these were committed before the rules took effect; `jar-check/`, `src_backup/`, and `out/` aren't ignored at all. **Fix:** `git rm -r --cached` those four trees, add `jar-check/`, `src_backup/`, `**/out/`, and `vscode-extension/node_modules/` to `.gitignore`, and confirm `git status` is clean. (Listed here for completeness; in impact this is closer to High.)
+**[H7 / hygiene] Committed build artifacts dominate the repo.** At review time ~576 of 769 tracked files were junk (`jar-check/`, `.class`, `target/`, `src_backup/`, `vscode-extension/out/`). After the author's cleanup the tree is smaller but still artifact-heavy: **278 of 443 tracked files (~63%)** are junk — 207 under `jar-check/`, 56 under `microhubs-backend/src_backup/` (a backup-of-a-backup), 8 under `vscode-extension/out/`, and 7 Eclipse project files (`.classpath`, `.project`, `.settings/`). `target/` and the duplicate `microhubs-backend/frontend/` are already clean. `.gitignore` listed `target/`/`*.class`/`*.jar` but these were committed before the rules took effect; `jar-check/`, `src_backup/`, `out/`, and the Eclipse files weren't ignored at all. **Fix:** `git rm -r --cached` those trees, add the missing patterns to `.gitignore`, and confirm `git status` is clean.
+
+**Status (2026-08-23): ◐ In progress.** `.gitignore` was extended (Eclipse files, `jar-check/`, `src_backup/`, `vscode-extension/out/`, `/backend/`) and a new `.gitattributes` (`* text=auto eol=lf`) was added to stop the CRLF↔LF churn that was polluting diffs. The patterns are verified to match (`git check-ignore --no-index`). The actual **untracking is left to the author** — the `git rm --cached` commands are provided in the hand-off — because it is an index/commit operation. No source is deleted from disk; only the git index changes.
 
 ---
 
@@ -170,16 +208,16 @@ A fair review should be clear about what's solid — and a lot is:
 ## Prioritized action plan
 
 **Before any deployment (do first):**
-1. Add `verifyWorkspaceMembership` to `getCapsule`, `listCapsules`, `updateCapsule`, `listComments`, `getResolution` (C1, H2). ~5 small edits, closes the whole IDOR cluster.
-2. Fix the schema/entity mismatch so the stack boots from clean — adopt Flyway or ship a complete `schema.sql` (C2).
-3. Remove the default `JWT_SECRET`, fail fast if unset, and set a real random secret (H1).
-4. Fix the `ws` scope bug so the frontend builds (H4).
+1. ✅ **Done** — `verifyWorkspaceMembership` added to `getCapsule`, `listCapsules`, `updateCapsule`, `listComments`, `getResolution` (C1, H2). The whole IDOR cluster is closed.
+2. ✅ **Done (interim)** — `schema.sql` rewritten to the full entity set so the stack boots clean (C2). Still worth adopting Flyway for a single source of truth, and booting from an empty volume to confirm.
+3. ✅ **Done** — default `JWT_SECRET` removed, fail-fast on unset/weak (H1). ⚠️ Author still needs to set a real random secret in each environment (incl. local `.env`).
+4. ✅ **Done** — `ws` scope bug fixed; frontend type-checks clean (H4).
 
 **This week:**
-5. Add the pgvector ANN index + FK indexes (H5).
-6. Delete the dead `backend/` folder and rotate its committed credentials (H6); `git rm --cached` the build artifacts and fix `.gitignore` (H7).
-7. Move the JWT off `localStorage` (H3).
-8. Fix the async/transaction race so knowledge actually generates (M1), and add LLM timeouts (M3).
+5. ✅ **Done** — pgvector HNSW ANN index + FK/lookup indexes added (H5).
+6. ✅/◐ **Partly done** — dead `backend/` deleted (H6); ⚠️ rotate its historical credentials; `.gitignore`/`.gitattributes` updated, and `git rm --cached` for the remaining artifacts is staged for the author to run (H7).
+7. ◐ **Hardened, not complete** — JWT storage surface minimized; the `localStorage → httpOnly cookie` migration remains the real fix (H3).
+8. ☐ **Open (Medium, out of this pass's scope)** — fix the async/transaction race so knowledge actually generates (M1), and add LLM timeouts (M3).
 
 **Hardening backlog:** the remaining Medium items (Docker/compose robustness, webview CSP, JSON injection, error-handling, moderation of auto-public knowledge) and the Low cleanups.
 

@@ -13,6 +13,8 @@ public interface WorkspaceMemberRepository extends JpaRepository<WorkspaceMember
 
     Optional<WorkspaceMember> findByWorkspaceAndUser(Workspace workspace, User user);
 
+    List<WorkspaceMember> findByWorkspace(Workspace workspace);
+
     boolean existsByWorkspaceAndUser(Workspace workspace, User user);
 
     boolean existsByWorkspaceIdAndUserId(UUID workspaceId, UUID userId);

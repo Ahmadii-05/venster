@@ -36,6 +36,13 @@ CREATE TABLE projects (
     workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
     description TEXT,
+    repository_url VARCHAR(500),
+    tech_stack VARCHAR(255),
+    status VARCHAR(20) DEFAULT 'PLANNING'
+        CHECK (status IN ('PLANNING','ACTIVE','ON_HOLD','COMPLETED','ARCHIVED')),
+    priority VARCHAR(20) DEFAULT 'MEDIUM'
+        CHECK (priority IN ('LOW','MEDIUM','HIGH')),
+    target_date DATE,
     created_at TIMESTAMP NOT NULL DEFAULT now(),
     updated_at TIMESTAMP NOT NULL DEFAULT now()
 );

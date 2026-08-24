@@ -33,4 +33,22 @@ public class ProjectController {
         ApiResponse<List<Project>> response = projectService.listProjects(workspaceId, email);
         return ResponseEntity.ok(response);
     }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<ApiResponse<Project>> getProject(@PathVariable UUID id) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        String email = auth.getName();
+        ApiResponse<Project> response = projectService.getProject(id, email);
+        return ResponseEntity.ok(response);
+    }
+
+    @PatchMapping("/{id}")
+    public ResponseEntity<ApiResponse<Project>> updateProject(
+            @PathVariable UUID id,
+            @Valid @RequestBody ProjectRequest request) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        String email = auth.getName();
+        ApiResponse<Project> response = projectService.updateProject(id, email, request);
+        return ResponseEntity.ok(response);
+    }
 }

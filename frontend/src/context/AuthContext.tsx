@@ -22,7 +22,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     try {
       const res = await authApi.login({ email, password });
-      setAuthToken(res.token, res.email);
+      setAuthToken(res.token);
       setToken(res.token);
       setEmail(res.email);
     } finally {
@@ -35,7 +35,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(true);
       try {
         const res = await authApi.register({ name, email, password });
-        setAuthToken(res.token, res.email);
+        setAuthToken(res.token);
         setToken(res.token);
         setEmail(res.email);
       } finally {
