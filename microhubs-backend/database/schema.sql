@@ -59,6 +59,17 @@ CREATE TABLE projects (
     updated_at TIMESTAMP NOT NULL DEFAULT now()
 );
 
+-- Project teams: the authorization boundary for everything below a project.
+-- Only users on a project's team may see or act on that project's capsules.
+-- Carries no role — every team member is equal and any may manage the roster.
+CREATE TABLE project_members (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMP NOT NULL DEFAULT now(),
+    UNIQUE (project_id, user_id)
+);
+
 -- ─────────────────────────────────────────────────────────────
 -- Artifact / anchor chain (code location a capsule is attached to)
 -- ─────────────────────────────────────────────────────────────
@@ -219,6 +230,8 @@ CREATE TABLE global_reports (
 CREATE INDEX IF NOT EXISTS idx_workspace_members_workspace ON workspace_members(workspace_id);
 CREATE INDEX IF NOT EXISTS idx_workspace_members_user      ON workspace_members(user_id);
 CREATE INDEX IF NOT EXISTS idx_projects_workspace          ON projects(workspace_id);
+CREATE INDEX IF NOT EXISTS idx_project_members_project     ON project_members(project_id);
+CREATE INDEX IF NOT EXISTS idx_project_members_user        ON project_members(user_id);
 CREATE INDEX IF NOT EXISTS idx_artifacts_project           ON artifacts(project_id);
 CREATE INDEX IF NOT EXISTS idx_artifact_versions_artifact  ON artifact_versions(artifact_id);
 CREATE INDEX IF NOT EXISTS idx_artifact_anchors_version    ON artifact_anchors(artifact_version_id);

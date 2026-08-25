@@ -189,7 +189,7 @@ export default function GlobalKnowledgePage() {
       <div>
         <div className="eyebrow mb-1.5">Community</div>
         <h1 className="font-display text-2xl font-bold" style={{ color: "var(--color-text-primary)" }}>
-          Global Community
+          Community Insights
         </h1>
         <p className="text-sm mt-1.5 max-w-2xl leading-relaxed" style={{ color: "var(--color-text-secondary)" }}>
           Browse solved problems shared publicly across all teams, or search for a specific one. No workspace required.
@@ -278,7 +278,7 @@ export default function GlobalKnowledgePage() {
       {!busy && !searched && results.length === 0 && (
         <div className="text-center py-12" style={{ color: "var(--color-text-muted)" }}>
           <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>No community solutions have been shared yet.</p>
-          <p className="text-xs mt-1">Publish a resolved capsule to the Global Community and it will show up here.</p>
+          <p className="text-xs mt-1">Publish a resolved capsule to Community Insights and it will show up here.</p>
         </div>
       )}
 

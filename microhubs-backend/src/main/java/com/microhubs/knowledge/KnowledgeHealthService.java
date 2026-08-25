@@ -48,7 +48,7 @@ public class KnowledgeHealthService {
         List<KnowledgeHealthResponse.AgingCapsule> agingCapsules = new ArrayList<>();
         try {
             List<Object[]> rows = capsuleRepository.findAgingCapsulesByWorkspace(
-                    workspaceId, agingThresholdDays);
+                    workspaceId, user.getId(), agingThresholdDays);
             for (Object[] row : rows) {
                 UUID capsuleId = (UUID) row[0];
                 String title = (String) row[1];
@@ -65,7 +65,7 @@ public class KnowledgeHealthService {
         // Hot artifacts
         List<KnowledgeHealthResponse.HotArtifact> hotArtifacts = new ArrayList<>();
         try {
-            List<Object[]> rows = capsuleRepository.findHotArtifactsByWorkspace(workspaceId);
+            List<Object[]> rows = capsuleRepository.findHotArtifactsByWorkspace(workspaceId, user.getId());
             for (Object[] row : rows) {
                 UUID artifactId = (UUID) row[0];
                 String filePath = (String) row[1];

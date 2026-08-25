@@ -7,7 +7,9 @@
   "engines": {
     "vscode": "^1.85.0"
   },
-  "categories": ["Other"],
+  "categories": [
+    "Other"
+  ],
   "activationEvents": [],
   "main": "./out/extension.js",
   "contributes": {
@@ -39,6 +41,14 @@
       {
         "command": "microhubs.searchKnowledge",
         "title": "Micro-Hubs: Search Knowledge"
+      },
+      {
+        "command": "microhubs.openVenster",
+        "title": "Micro-Hubs: Open Venster UI"
+      },
+      {
+        "command": "microhubs.createCapsuleInVenster",
+        "title": "Micro-Hubs: Create Capsule in Venster UI"
       }
     ],
     "viewsContainers": {
@@ -55,6 +65,11 @@
         {
           "id": "microhubs.capsules",
           "name": "Capsules"
+        },
+        {
+          "id": "microhubs.venster",
+          "name": "Venster",
+          "type": "webview"
         }
       ]
     },
@@ -79,12 +94,14 @@
     }
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile",
+    "vscode:prepublish": "npm run build:webview && npm run compile",
     "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./"
+    "watch": "tsc -watch -p ./",
+    "build:webview": "cd ../frontend && npm run build:webview",
+    "build": "npm run build:webview && npm run compile"
   },
   "devDependencies": {
-    "@types/node": "^20.11.0",
+    "@types/node": "^20.19.43",
     "@types/vscode": "^1.85.0",
     "typescript": "^5.3.0"
   }

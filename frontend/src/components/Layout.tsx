@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { notificationApi } from "../services/api";
+import { isInVsCode } from "../services/vscodeBridge";
 import type { Notification } from "../types";
 import NewCapsuleModal from "./NewCapsuleModal";
 import Avatar from "./ui/Avatar";
@@ -13,7 +14,7 @@ const SIDEBAR_ITEMS = [
   { path: "/", label: "Dashboard", icon: "dashboard" as const },
   { path: "/workspaces", label: "Workspaces", icon: "folder" as const },
   { path: "/knowledge", label: "Knowledge Base", icon: "book" as const },
-  { path: "/knowledge/global", label: "Global Community", icon: "globe" as const },
+  { path: "/knowledge/global", label: "Community Insights", icon: "globe" as const },
   { path: "/community", label: "Community Q&A", icon: "chat" as const },
   { path: "/notifications", label: "Notifications", icon: "bell" as const },
   { path: "/profile", label: "Profile", icon: "user" as const },
@@ -29,6 +30,15 @@ export default function Layout({ children }: { children: ReactNode }) {
   const [showNewCapsule, setShowNewCapsule] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+
+  // VS Code: the extension can ask us to open the capsule creation UI
+  // (e.g. via the "Create Capsule in Venster UI" command / editor menu).
+  useEffect(() => {
+    if (!isInVsCode) return;
+    const handler = () => setShowNewCapsule(true);
+    window.addEventListener("venster:newCapsule", handler);
+    return () => window.removeEventListener("venster:newCapsule", handler);
+  }, []);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
   const userName = email?.split("@")[0] || "User";

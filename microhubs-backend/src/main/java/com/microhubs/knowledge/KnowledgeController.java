@@ -113,6 +113,19 @@ public class KnowledgeController {
     }
 
     /**
+     * Fetch full detail (body + top answers) for a single external result so the
+     * UI can expand it inline instead of sending the user to the external site.
+     * Two-segment literal path ({@code /external/detail}) does not collide with
+     * {@code GET /{id}} (single segment) or {@code /external}.
+     */
+    @GetMapping("/external/detail")
+    public ResponseEntity<ApiResponse<ExternalKnowledgeDetail>> externalDetail(
+            @RequestParam String id,
+            @RequestParam(required = false, defaultValue = "stackoverflow") String source) {
+        return ResponseEntity.ok(externalKnowledgeService.detail(source, id));
+    }
+
+    /**
      * AI answer with citations: synthesize a direct, grounded answer to a
      * natural-language question from the top matching knowledge entries.
      * Body: {@code {"q": "...", "scope": "mine"|"global", "category": "...", "tags": "..."}}.

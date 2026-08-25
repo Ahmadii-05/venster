@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import Modal from "./ui/Modal";
 import Icon from "./ui/Icon";
 import { artifactApi, capsuleApi, capsuleSuggestionApi, projectApi, workspaceApi } from "../services/api";
+import { isInVsCode, requestCurrentContext } from "../services/vscodeBridge";
 import type { Workspace, Project } from "../types";
 import type { SimilarKnowledgeItem } from "../services/api";
 
@@ -65,6 +66,25 @@ export default function NewCapsuleModal({ open, onClose }: NewCapsuleModalProps)
     reset();
     onClose();
   };
+
+  // VS Code: when the modal opens, automatically pull the current editor
+  // context (file path, selection, line range) so the developer never has to
+  // type it manually. Fields stay editable for manual overrides.
+  useEffect(() => {
+    if (!open || !isInVsCode) return;
+    let cancelled = false;
+    requestCurrentContext().then((ctx) => {
+      if (cancelled || !ctx) return;
+      setFilePath(ctx.filePath ?? "");
+      setCodeSnippet(ctx.selectedCode ?? "");
+      setStartLine(ctx.startLine != null ? String(ctx.startLine) : "");
+      setEndLine(ctx.endLine != null ? String(ctx.endLine) : "");
+      if (ctx.workspaceName) setRepository(ctx.workspaceName);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
 
   // Step 1: Load workspaces
   const goToProjectStep = async () => {

@@ -13,6 +13,7 @@ package com.microhubs.knowledge;
  */
 public record ExternalKnowledgeItem(
         String source,      // "stackoverflow" | "sofa"
+        String id,          // provider post id (SO question_id); powers inline detail fetch, may be null
         String title,
         String snippet,     // short excerpt, may be null (SO default filter omits body)
         String url,         // canonical link to the external post

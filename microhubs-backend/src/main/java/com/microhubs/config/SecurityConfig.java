@@ -3,6 +3,7 @@ package com.microhubs.config;
 import com.microhubs.security.JwtAuthFilter;
 import jakarta.servlet.http.HttpServletResponse;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -20,6 +21,7 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.util.Arrays;
 import java.util.List;
 
 @Configuration
@@ -28,9 +30,17 @@ import java.util.List;
 public class SecurityConfig {
 
     private final JwtAuthFilter jwtAuthFilter;
+    private final List<String> corsAllowedOrigins;
 
-    public SecurityConfig(JwtAuthFilter jwtAuthFilter) {
+    public SecurityConfig(
+            JwtAuthFilter jwtAuthFilter,
+            @Value("${cors.allowed-origins:http://localhost:*,vscode-webview://*}")
+            String corsAllowedOrigins) {
         this.jwtAuthFilter = jwtAuthFilter;
+        this.corsAllowedOrigins = Arrays.stream(corsAllowedOrigins.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .toList();
     }
 
     @Bean
@@ -58,7 +68,7 @@ public class SecurityConfig {
 
             .exceptionHandling(exception -> exception
 
-                // No authentication → 401
+                // No authentication -> 401
                 .authenticationEntryPoint((request, response, authException) -> {
                     response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                     response.setContentType("application/json");
@@ -67,7 +77,7 @@ public class SecurityConfig {
                     );
                 })
 
-                // Authenticated but insufficient permission → 403
+                // Authenticated but insufficient permission -> 403
                 .accessDeniedHandler((request, response, accessDeniedException) -> {
                     response.setStatus(HttpServletResponse.SC_FORBIDDEN);
                     response.setContentType("application/json");
@@ -99,19 +109,36 @@ public class SecurityConfig {
         return http.build();
     }
 
+    /**
+     * Centralized CORS configuration used by the Spring Security CorsFilter.
+     * <p>
+     * Allowed origins are read from the {@code CORS_ALLOWED_ORIGINS} environment
+     * variable (comma-separated).  The default permits all localhost ports and
+     * VS Code webview origins ({@code vscode-webview://*}).
+     * <p>
+     * Only {@code allowedOriginPatterns} is used — never mix {@code allowedOrigins}
+     * with {@code allowedOriginPatterns} on the same {@link CorsConfiguration} as
+     * that can cause conflicts in Spring Boot 3.2.
+     * <p>
+     * Credentials are disabled because the API uses JWT tokens in the
+     * {@code Authorization} header rather than cookies.
+     */
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of(
-                "http://localhost:3000",
-                "http://localhost:4173",
-                "http://localhost:5173",
-                "http://localhost:5180",
-                "http://localhost:8080"
-        ));
-        config.setAllowedMethods(List.of("GET","POST","PUT","PATCH","DELETE","OPTIONS"));
+
+        // Use only allowedOriginPatterns so that wildcard localhost ports and
+        // the dynamic vscode-webview:// protocol are both supported.
+        config.setAllowedOriginPatterns(corsAllowedOrigins);
+
+        config.setAllowedMethods(
+                List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+
         config.setAllowedHeaders(List.of("*"));
-        config.setAllowCredentials(true);
+
+        // JWT tokens are sent via the Authorization header — no cookies involved.
+        config.setAllowCredentials(false);
+
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
         return source;

@@ -1,5 +1,11 @@
-import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
 import { authApi, setAuthToken, clearAuthToken, getStoredToken } from "../services/api";
+import {
+  isInVsCode,
+  requestAuthState,
+  onBridgeMessage,
+  postMessage,
+} from "../services/vscodeBridge";
 
 interface AuthState {
   token: string | null;
@@ -18,6 +24,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [email, setEmail] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // Inside VS Code, the extension's SecretStorage is the source of truth:
+  // pull the initial token and stay in sync with native login/logout.
+  useEffect(() => {
+    if (!isInVsCode) return;
+    requestAuthState().then((t) => {
+      if (t) {
+        setAuthToken(t);
+        setToken(t);
+      }
+    });
+    const off = onBridgeMessage((msg) => {
+      if (msg.type !== "authState") return;
+      const t = msg.payload.token;
+      if (t) {
+        setAuthToken(t);
+        setToken(t);
+      } else {
+        clearAuthToken();
+        setToken(null);
+        setEmail(null);
+      }
+    });
+    return off;
+  }, []);
+
   const login = useCallback(async (email: string, password: string) => {
     setLoading(true);
     try {
@@ -25,6 +56,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setAuthToken(res.token);
       setToken(res.token);
       setEmail(res.email);
+      // Let the extension persist the token in its secure storage.
+      postMessage("tokenUpdated", { token: res.token });
     } finally {
       setLoading(false);
     }
@@ -38,6 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setAuthToken(res.token);
         setToken(res.token);
         setEmail(res.email);
+        postMessage("tokenUpdated", { token: res.token });
       } finally {
         setLoading(false);
       }
@@ -49,6 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearAuthToken();
     setToken(null);
     setEmail(null);
+    postMessage("tokenUpdated", { token: null });
   }, []);
 
   return (

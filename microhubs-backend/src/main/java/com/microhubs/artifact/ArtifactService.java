@@ -4,9 +4,8 @@ import com.microhubs.auth.User;
 import com.microhubs.auth.UserRepository;
 import com.microhubs.common.ApiResponse;
 import com.microhubs.project.Project;
+import com.microhubs.project.ProjectMemberRepository;
 import com.microhubs.project.ProjectRepository;
-import com.microhubs.workspace.Workspace;
-import com.microhubs.workspace.WorkspaceMemberRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -29,7 +28,7 @@ public class ArtifactService {
     @Autowired
     private UserRepository userRepository;
     @Autowired
-    private WorkspaceMemberRepository workspaceMemberRepository;
+    private ProjectMemberRepository projectMemberRepository;
 
     /**
      * Create or reuse an artifact for a file path under a project.
@@ -38,7 +37,7 @@ public class ArtifactService {
     public ApiResponse<Artifact> createArtifact(String email, ArtifactRequest request) {
         User user = getUser(email);
         Project project = getProject(request.getProjectId());
-        verifyWorkspaceMembership(project.getWorkspace(), user);
+        verifyProjectMembership(project, user);
 
         // Reuse existing artifact if same project + filePath
         Artifact artifact = artifactRepository
@@ -61,7 +60,7 @@ public class ArtifactService {
             UUID artifactId, String email, ArtifactVersionRequest request) {
         User user = getUser(email);
         Artifact artifact = getArtifact(artifactId);
-        verifyWorkspaceMembership(artifact.getProject().getWorkspace(), user);
+        verifyProjectMembership(artifact.getProject(), user);
 
         ArtifactVersion version = new ArtifactVersion();
         version.setArtifact(artifact);
@@ -79,8 +78,8 @@ public class ArtifactService {
             UUID versionId, String email, ArtifactAnchorRequest request) {
         User user = getUser(email);
         ArtifactVersion version = getVersion(versionId);
-        verifyWorkspaceMembership(
-                version.getArtifact().getProject().getWorkspace(), user);
+        verifyProjectMembership(
+                version.getArtifact().getProject(), user);
 
         ArtifactAnchor anchor = new ArtifactAnchor();
         anchor.setArtifactVersion(version);
@@ -116,12 +115,12 @@ public class ArtifactService {
                 .orElseThrow(() -> new RuntimeException("Artifact version not found"));
     }
 
-    private void verifyWorkspaceMembership(Workspace workspace, User user) {
-        boolean isMember = workspaceMemberRepository
-                .existsByWorkspaceAndUser(workspace, user);
+    private void verifyProjectMembership(Project project, User user) {
+        boolean isMember = projectMemberRepository
+                .existsByProjectAndUser(project, user);
         if (!isMember) {
             throw new AccessDeniedException(
-                    "User is not a member of this workspace");
+                    "User is not a member of this project team");
         }
     }
 }

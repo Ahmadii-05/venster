@@ -1,0 +1,10 @@
+# Keep the packaged VSIX lean: sources and build tooling stay out,
+# only out/ (compiled extension) and webview/dist (React production
+# build) ship.
+.vscode/**
+src/**
+node_modules/**/*.map
+out/**/*.map
+webview/dist/**/*.map
+tsconfig.json
+**/*.ts

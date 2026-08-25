@@ -51,4 +51,36 @@ public class ProjectController {
         ApiResponse<Project> response = projectService.updateProject(id, email, request);
         return ResponseEntity.ok(response);
     }
+
+    // ── Project team management ──────────────────────────────────
+
+    @GetMapping("/{id}/members")
+    public ResponseEntity<ApiResponse<List<ProjectMember>>> listMembers(@PathVariable UUID id) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        String email = auth.getName();
+        ApiResponse<List<ProjectMember>> response = projectService.listProjectMembers(id, email);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/{id}/members")
+    public ResponseEntity<ApiResponse<ProjectMember>> addMember(
+            @PathVariable UUID id,
+            @Valid @RequestBody ProjectMemberRequest request) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        String email = auth.getName();
+        ApiResponse<ProjectMember> response =
+                projectService.addProjectMember(id, email, request.getEmail());
+        return ResponseEntity.ok(response);
+    }
+
+    @DeleteMapping("/{id}/members/{memberEmail}")
+    public ResponseEntity<ApiResponse<Void>> removeMember(
+            @PathVariable UUID id,
+            @PathVariable String memberEmail) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        String email = auth.getName();
+        ApiResponse<Void> response =
+                projectService.removeProjectMember(id, email, memberEmail);
+        return ResponseEntity.ok(response);
+    }
 }

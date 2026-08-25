@@ -4,14 +4,69 @@ import { notificationApi } from "../services/api";
 import type { Notification } from "../types";
 import Icon, { type IconName } from "../components/ui/Icon";
 
-const TYPE_ICONS: Record<string, { icon: IconName; color: string }> = {
-  CAPSULE_ASSIGNED: { icon: "user", color: "var(--color-status-review)" },
-  CAPSULE_COMMENTED: { icon: "chat", color: "var(--color-status-open)" },
-  CAPSULE_RESOLVED: { icon: "check", color: "var(--color-status-resolved)" },
-  CAPSULE_STATUS_CHANGED: { icon: "reply", color: "var(--color-status-answered)" },
-  COMMENT: { icon: "chat", color: "var(--color-status-open)" },
-  MENTION: { icon: "user", color: "var(--color-accent)" },
+// Per-type presentation: icon + accent color + a human-readable category label.
+// Backend emits CAPSULE_ASSIGNED / NEW_COMMENT / CAPSULE_RESOLVED today; the
+// extra keys are tolerated so future types render sensibly instead of raw.
+const TYPE_META: Record<string, { icon: IconName; color: string; label: string }> = {
+  CAPSULE_ASSIGNED: { icon: "user", color: "var(--color-status-review)", label: "Assigned to you" },
+  NEW_COMMENT: { icon: "chat", color: "var(--color-status-open)", label: "New comment" },
+  CAPSULE_COMMENTED: { icon: "chat", color: "var(--color-status-open)", label: "New comment" },
+  CAPSULE_RESOLVED: { icon: "check", color: "var(--color-status-resolved)", label: "Resolved" },
+  CAPSULE_STATUS_CHANGED: { icon: "reply", color: "var(--color-status-answered)", label: "Status changed" },
+  COMMENT: { icon: "chat", color: "var(--color-status-open)", label: "New comment" },
+  MENTION: { icon: "user", color: "var(--color-accent)", label: "Mention" },
 };
+
+// The `context` column is JSONB. Each type stores a small object, e.g.
+// CAPSULE_ASSIGNED → { capsuleId, title }, NEW_COMMENT → { capsuleId, commentId },
+// CAPSULE_RESOLVED → { capsuleId, resolutionId }. Parse defensively so a bad
+// or empty payload never crashes the list — we just fall back to generics.
+interface NotifContext {
+  capsuleId?: string;
+  title?: string;
+  commentId?: string;
+  resolutionId?: string;
+}
+
+function parseContext(raw: string | null): NotifContext {
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? (parsed as NotifContext) : {};
+  } catch {
+    return {};
+  }
+}
+
+// A short ticket-style reference for a capsule, matching the app's convention
+// (first 8 chars of the UUID, uppercased) used on capsule/profile pages.
+function capsuleRef(id?: string): string | null {
+  return id ? `#${id.slice(0, 8).toUpperCase()}` : null;
+}
+
+// Turn a (type, context) pair into a readable sentence. Prefer the capsule
+// title when the payload carries it; otherwise reference it by short id.
+function describe(type: string, ctx: NotifContext): string {
+  const title = ctx.title?.trim();
+  const ref = capsuleRef(ctx.capsuleId);
+  const subject = title ? `"${title}"` : ref ? `capsule ${ref}` : "a capsule";
+  switch (type) {
+    case "CAPSULE_ASSIGNED":
+      return `You were assigned to review ${subject}.`;
+    case "NEW_COMMENT":
+    case "CAPSULE_COMMENTED":
+    case "COMMENT":
+      return `New comment on ${subject}.`;
+    case "CAPSULE_RESOLVED":
+      return `${title ? subject : `Capsule ${ref ?? ""}`.trim()} was resolved.`;
+    case "CAPSULE_STATUS_CHANGED":
+      return `The status of ${subject} changed.`;
+    case "MENTION":
+      return `You were mentioned on ${subject}.`;
+    default:
+      return `Update on ${subject}.`;
+  }
+}
 
 function timeAgo(dateStr: string): string {
   const now = Date.now();
@@ -110,7 +165,15 @@ export default function NotificationsPage() {
       ) : (
         <div className="space-y-2">
           {notifications.map((n) => {
-            const typeInfo = TYPE_ICONS[n.type] || { icon: "bell" as IconName, color: "var(--color-text-muted)" };
+            const meta = TYPE_META[n.type] || {
+              icon: "bell" as IconName,
+              color: "var(--color-text-muted)",
+              label: n.type.replace(/_/g, " ").toLowerCase(),
+            };
+            const ctx = parseContext(n.context);
+            const message = describe(n.type, ctx);
+            const ref = capsuleRef(ctx.capsuleId);
+            const capsuleLink = ctx.capsuleId ? `/capsules/${ctx.capsuleId}` : null;
             return (
               <div
                 key={n.id}
@@ -124,7 +187,7 @@ export default function NotificationsPage() {
                 {!n.read && (
                   <span
                     className="absolute left-0 top-0 bottom-0 w-[3px]"
-                    style={{ backgroundColor: typeInfo.color }}
+                    style={{ backgroundColor: meta.color }}
                     aria-hidden="true"
                   />
                 )}
@@ -132,9 +195,9 @@ export default function NotificationsPage() {
                 <div className="relative shrink-0">
                   <div
                     className="w-9 h-9 rounded-lg flex items-center justify-center"
-                    style={{ backgroundColor: "var(--color-bg-input)", color: typeInfo.color }}
+                    style={{ backgroundColor: "var(--color-bg-input)", color: meta.color }}
                   >
-                    <Icon name={typeInfo.icon} size={16} />
+                    <Icon name={meta.icon} size={16} />
                   </div>
                   {!n.read && (
                     <div
@@ -147,11 +210,8 @@ export default function NotificationsPage() {
                 {/* Content */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-0.5">
-                    <span
-                      className="eyebrow"
-                      style={{ color: typeInfo.color }}
-                    >
-                      {n.type.replace(/_/g, " ")}
+                    <span className="eyebrow" style={{ color: meta.color }}>
+                      {meta.label}
                     </span>
                     {!n.read && (
                       <span
@@ -161,9 +221,15 @@ export default function NotificationsPage() {
                     )}
                   </div>
                   <p className="text-sm" style={{ color: "var(--color-text-primary)" }}>
-                    {n.context || "No details available"}
+                    {message}
                   </p>
                   <div className="flex items-center gap-2 mt-1 text-[10px] font-mono" style={{ color: "var(--color-text-muted)" }}>
+                    {ref && (
+                      <>
+                        <span>{ref}</span>
+                        <span aria-hidden="true">·</span>
+                      </>
+                    )}
                     <span>{timeAgo(n.createdAt)}</span>
                   </div>
                 </div>
@@ -179,13 +245,18 @@ export default function NotificationsPage() {
                       Mark read
                     </button>
                   )}
-                  <Link
-                    to="/"
-                    className="px-2 py-1 rounded text-[10px] font-mono font-medium transition-all hover:opacity-80"
-                    style={{ color: "var(--color-accent)" }}
-                  >
-                    Open
-                  </Link>
+                  {capsuleLink && (
+                    <Link
+                      to={capsuleLink}
+                      onClick={() => {
+                        if (!n.read) handleMarkAsRead(n.id);
+                      }}
+                      className="px-2 py-1 rounded text-[10px] font-mono font-medium transition-all hover:opacity-80"
+                      style={{ color: "var(--color-accent)" }}
+                    >
+                      Open
+                    </Link>
+                  )}
                 </div>
               </div>
             );

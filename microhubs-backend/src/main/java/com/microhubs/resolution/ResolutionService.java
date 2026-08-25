@@ -7,6 +7,8 @@ import com.microhubs.capsule.CapsuleRepository;
 import com.microhubs.capsule.CapsuleService;
 import com.microhubs.capsule.CapsuleStatus;
 import com.microhubs.common.ApiResponse;
+import com.microhubs.project.Project;
+import com.microhubs.project.ProjectMemberRepository;
 import com.microhubs.workspace.Workspace;
 import com.microhubs.workspace.WorkspaceMember;
 import com.microhubs.notification.NotificationService;
@@ -34,6 +36,8 @@ public class ResolutionService {
     @Autowired
     private WorkspaceMemberRepository workspaceMemberRepository;
     @Autowired
+    private ProjectMemberRepository projectMemberRepository;
+    @Autowired
     private ApplicationEventPublisher eventPublisher;
     @Autowired
     private NotificationService notificationService;
@@ -41,8 +45,8 @@ public class ResolutionService {
     /**
      * Resolve a capsule.
      *
-     * Authorization: Only the capsule's assigned reviewer OR a workspace
-     * ADMIN/OWNER may resolve it.
+     * Authorization: the caller must be on the capsule's project team AND be
+     * either the assigned reviewer OR a workspace ADMIN/OWNER.
      *
      * On success:
      * 1. Verify no resolution already exists (one per capsule)
@@ -63,7 +67,8 @@ public class ResolutionService {
                     "This capsule has already been resolved");
         }
 
-        // Authorization: reviewer OR workspace ADMIN/OWNER
+        // Authorization: must be on the project team, and either the assigned
+        // reviewer or a workspace ADMIN/OWNER.
         verifyResolverAuthorization(capsule, resolver);
 
         // Guard: capsule must be in ANSWERED status to resolve
@@ -105,8 +110,8 @@ public class ResolutionService {
         Resolution resolution = resolutionRepository.findByCapsuleId(capsuleId)
                 .orElseThrow(() -> new RuntimeException("Resolution not found for this capsule"));
 
-        // Only workspace members may read a resolution
-        verifyWorkspaceMembership(resolution.getCapsule(), user);
+        // Only project-team members may read a resolution
+        verifyProjectMembership(resolution.getCapsule(), user);
         return ApiResponse.success(resolution);
     }
 
@@ -118,27 +123,37 @@ public class ResolutionService {
     }
 
     /**
-     * Only the capsule's reviewer OR a workspace ADMIN/OWNER may resolve.
+     * The caller must be on the capsule's project team, and be either the
+     * assigned reviewer OR a workspace ADMIN/OWNER. Project-team membership is
+     * the hard isolation boundary — a workspace admin who is not on the team
+     * cannot reach across into another team's capsule.
      */
     private void verifyResolverAuthorization(Capsule capsule, User resolver) {
-        // Check if user is the assigned reviewer
+        Project project = capsule.getArtifactAnchor()
+                .getArtifactVersion()
+                .getArtifact()
+                .getProject();
+
+        // Hard gate: must be on the project team at all.
+        if (!projectMemberRepository.existsByProjectAndUser(project, resolver)) {
+            throw new AccessDeniedException(
+                    "User is not a member of this project team");
+        }
+
+        // The assigned reviewer may resolve.
         boolean isReviewer = capsule.getReviewer() != null
                 && capsule.getReviewer().getId().equals(resolver.getId());
         if (isReviewer) {
             return;
         }
 
-        // Check if user is ADMIN or OWNER in the capsule's workspace
-        Workspace workspace = capsule.getArtifactAnchor()
-                .getArtifactVersion()
-                .getArtifact()
-                .getProject()
-                .getWorkspace();
-
+        // Otherwise a workspace ADMIN/OWNER (who is also on the team, per the
+        // check above) may resolve.
+        Workspace workspace = project.getWorkspace();
         WorkspaceMember membership = workspaceMemberRepository
                 .findByWorkspaceAndUser(workspace, resolver)
                 .orElseThrow(() -> new AccessDeniedException(
-                        "User is not a member of this workspace"));
+                        "Only the capsule's reviewer or a workspace ADMIN/OWNER may resolve it"));
 
         if (membership.getRole() == WorkspaceMember.Role.ADMIN
                 || membership.getRole() == WorkspaceMember.Role.OWNER) {
@@ -150,20 +165,19 @@ public class ResolutionService {
     }
 
     /**
-     * Verify the user is a member (any role) of the capsule's workspace.
+     * Verify the user is on the capsule's project team.
      */
-    private void verifyWorkspaceMembership(Capsule capsule, User user) {
-        Workspace workspace = capsule.getArtifactAnchor()
+    private void verifyProjectMembership(Capsule capsule, User user) {
+        Project project = capsule.getArtifactAnchor()
                 .getArtifactVersion()
                 .getArtifact()
-                .getProject()
-                .getWorkspace();
+                .getProject();
 
-        boolean isMember = workspaceMemberRepository
-                .existsByWorkspaceAndUser(workspace, user);
+        boolean isMember = projectMemberRepository
+                .existsByProjectAndUser(project, user);
         if (!isMember) {
             throw new AccessDeniedException(
-                    "User is not a member of this workspace");
+                    "User is not a member of this project team");
         }
     }
 }

@@ -6,10 +6,12 @@ import {
   CapsuleTreeItem,
 } from "./CapsuleTreeProvider";
 import { NotificationPoller } from "./NotificationPoller";
+import { VensterViewProvider } from "./VensterViewProvider";
 
 let api: MicroHubsApi;
 let treeProvider: CapsuleTreeProvider;
 let poller: NotificationPoller;
+let vensterProvider: VensterViewProvider;
 
 export async function activate(context: vscode.ExtensionContext) {
   // ── API setup ─────────────────────────────────────────────
@@ -25,6 +27,31 @@ export async function activate(context: vscode.ExtensionContext) {
   if (storedToken) {
     api.setToken(storedToken);
   }
+
+  // ── Venster React webview (sidebar) ───────────────────────
+  vensterProvider = new VensterViewProvider(
+    context.extensionUri,
+    api,
+    async (token) => {
+      // Persist auth changes coming from the React UI into SecretStorage and
+      // keep the native tree/poller in sync.
+      if (token) {
+        await context.secrets.store("microhubs.token", token);
+        treeProvider.refresh();
+        poller.start(30000);
+      } else {
+        await context.secrets.delete("microhubs.token");
+        treeProvider.refresh();
+        poller.stop();
+      }
+    }
+  );
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(
+      VensterViewProvider.viewId,
+      vensterProvider
+    )
+  );
 
   // ── Tree view ─────────────────────────────────────────────
   treeProvider = new CapsuleTreeProvider(api);
@@ -61,6 +88,7 @@ export async function activate(context: vscode.ExtensionContext) {
         );
         treeProvider.refresh();
         poller.start(30000);
+        vensterProvider.postAuthState();
       } catch (err: any) {
         vscode.window.showErrorMessage(
           `Micro-Hubs: Login failed — ${err.message}`
@@ -77,6 +105,7 @@ export async function activate(context: vscode.ExtensionContext) {
       vscode.window.showInformationMessage("Micro-Hubs: Logged out");
       treeProvider.refresh();
       poller.stop();
+      vensterProvider.postAuthState();
     })
   );
 
@@ -178,7 +207,15 @@ export async function activate(context: vscode.ExtensionContext) {
       "microhubs.viewCapsules",
       async (item?: CapsuleTreeItem) => {
         if (item) {
-          // Open capsule detail
+          // Preferred: open the capsule inside the Venster React webview.
+          const openedInVenster = await vensterProvider.revealRoute(
+            `/capsules/${item.capsule.id}`
+          );
+          if (openedInVenster) {
+            return;
+          }
+
+          // Fallback: static HTML panel (used before the webview has resolved).
           const cap = item.capsule;
           const panel = vscode.window.createWebviewPanel(
             "capsuleDetail",
@@ -318,6 +355,20 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand("microhubs.refreshCapsules", () => {
       treeProvider.refresh();
       vscode.window.showInformationMessage("Micro-Hubs: Capsule list refreshed");
+    })
+  );
+
+  // Open the Venster React UI (focus the sidebar webview)
+  context.subscriptions.push(
+    vscode.commands.registerCommand("microhubs.openVenster", async () => {
+      await vscode.commands.executeCommand("microhubs.venster.focus");
+    })
+  );
+
+  // Create a capsule via the Venster React UI, prefilled with editor context
+  context.subscriptions.push(
+    vscode.commands.registerCommand("microhubs.createCapsuleInVenster", async () => {
+      await vensterProvider.notifyNewCapsule();
     })
   );
 

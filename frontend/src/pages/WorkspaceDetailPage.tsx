@@ -39,6 +39,9 @@ export default function WorkspaceDetailPage() {
   const [projectStatus, setProjectStatus] = useState<ProjectStatus>("PLANNING");
   const [projectPriority, setProjectPriority] = useState<ProjectPriority>("MEDIUM");
   const [projectTarget, setProjectTarget] = useState(""); // yyyy-MM-dd
+  // Workspace-member user ids chosen as the new project's initial team. The
+  // creator is always added by the backend, so they need not be picked here.
+  const [projectMemberIds, setProjectMemberIds] = useState<string[]>([]);
 
   // ── Add-member typeahead state ──────────────────────────────
   const [memberQuery, setMemberQuery] = useState("");
@@ -116,6 +119,7 @@ export default function WorkspaceDetailPage() {
         status: projectStatus,
         priority: projectPriority,
         targetDate: projectTarget || undefined,
+        memberIds: projectMemberIds.length ? projectMemberIds : undefined,
       });
       setProjects((prev) => [...prev, proj]);
       setProjectName("");
@@ -125,11 +129,20 @@ export default function WorkspaceDetailPage() {
       setProjectStatus("PLANNING");
       setProjectPriority("MEDIUM");
       setProjectTarget("");
+      setProjectMemberIds([]);
       setShowCreateProject(false);
       setError("");
     } catch (err: any) {
       setError(err.message);
     }
+  };
+
+  const toggleProjectMember = (userId: string) => {
+    setProjectMemberIds((prev) =>
+      prev.includes(userId)
+        ? prev.filter((x) => x !== userId)
+        : [...prev, userId]
+    );
   };
 
   const chooseUser = (u: UserSummary) => {
@@ -362,6 +375,50 @@ export default function WorkspaceDetailPage() {
                     </select>
                   </div>
                 </div>
+              </div>
+
+              {/* Project team — who can see and act on this project's capsules.
+                  Drawn from the workspace roster; you're added automatically as
+                  the creator. Members not chosen here can be added later. */}
+              <div className="pt-1 space-y-2 border-t" style={{ borderColor: "var(--color-border)" }}>
+                <div className="text-[10px] uppercase tracking-widest font-mono pt-2" style={{ color: "var(--color-text-muted)" }}>
+                  Project team · optional
+                </div>
+                <p className="text-[11px]" style={{ color: "var(--color-text-muted)" }}>
+                  Only team members can see this project and its capsules. You're added automatically.
+                </p>
+                {members.length === 0 ? (
+                  <p className="text-[11px]" style={{ color: "var(--color-text-muted)" }}>
+                    {membersError
+                      ? "Couldn't load the workspace roster."
+                      : "No other workspace members to add yet."}
+                  </p>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {members.map((m) => {
+                      const selected = projectMemberIds.includes(m.user.id);
+                      return (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => toggleProjectMember(m.user.id)}
+                          className="flex items-center gap-2 rounded-full pl-1 pr-3 py-1 text-xs border transition-all"
+                          style={{
+                            backgroundColor: selected ? "var(--color-accent-dim)" : "var(--color-bg-input)",
+                            borderColor: selected ? "var(--color-accent)" : "var(--color-border)",
+                            color: selected ? "var(--color-accent)" : "var(--color-text-secondary)",
+                          }}
+                        >
+                          <Avatar user={m.user} size="sm" />
+                          <span className="truncate max-w-[10rem]">
+                            {m.user.name || m.user.email.split("@")[0]}
+                          </span>
+                          {selected && <Icon name="check" size={12} />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               <button

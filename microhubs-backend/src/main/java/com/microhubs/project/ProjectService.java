@@ -31,12 +31,18 @@ public class ProjectService {
     @Autowired
     private WorkspaceMemberRepository workspaceMemberRepository;
 
+    @Autowired
+    private ProjectMemberRepository projectMemberRepository;
+
     /**
      * Create a project inside a workspace.
      *
-     * Business rule:
-     * Only users who are members of the workspace
-     * can create projects.
+     * The caller must belong to the workspace. The creator is always added to
+     * the new project's team, and any additional members named in the request
+     * (each of whom must already be a workspace member) are added too.
+     *
+     * From here on, project-team membership — not workspace membership —
+     * governs who can see and act on the project and its capsules.
      */
     public ApiResponse<Project> createProject(
             UUID workspaceId,
@@ -47,7 +53,7 @@ public class ProjectService {
 
         Workspace workspace = getWorkspace(workspaceId);
 
-        // Authorization check
+        // Must belong to the workspace to create a project in it.
         verifyWorkspaceMembership(workspace, user);
 
         Project project = new Project();
@@ -69,14 +75,33 @@ public class ProjectService {
 
         Project savedProject = projectRepository.save(project);
 
+        // The creator is always on the team.
+        addTeamMember(savedProject, user);
+
+        // Optional initial teammates chosen at creation time. Each must be a
+        // member of the owning workspace; unknown or non-workspace ids are
+        // skipped so a stray id can't fail the whole creation.
+        if (request.getMemberIds() != null) {
+            for (UUID memberId : request.getMemberIds()) {
+                if (memberId == null || memberId.equals(user.getId())) {
+                    continue;
+                }
+                userRepository.findById(memberId).ifPresent(candidate -> {
+                    if (workspaceMemberRepository.existsByWorkspaceAndUser(workspace, candidate)
+                            && !projectMemberRepository.existsByProjectAndUser(savedProject, candidate)) {
+                        addTeamMember(savedProject, candidate);
+                    }
+                });
+            }
+        }
+
         return ApiResponse.success(savedProject);
     }
 
     /**
      * Get a single project by ID.
      *
-     * Business rule:
-     * Only workspace members can view it.
+     * Business rule: only members of the project's team can view it.
      */
     @Transactional(readOnly = true)
     public ApiResponse<Project> getProject(UUID projectId, String email) {
@@ -85,7 +110,7 @@ public class ProjectService {
 
         Project project = getProjectById(projectId);
 
-        verifyWorkspaceMembership(project.getWorkspace(), user);
+        verifyProjectMembership(project, user);
 
         return ApiResponse.success(project);
     }
@@ -93,8 +118,7 @@ public class ProjectService {
     /**
      * Update a project's name, description, and technical metadata.
      *
-     * Business rule:
-     * Only members of the owning workspace can edit a project.
+     * Business rule: only members of the project's team can edit it.
      * The enum fields are only overwritten when supplied, so a partial
      * update can't accidentally blank out status or priority.
      */
@@ -108,7 +132,7 @@ public class ProjectService {
         Project project = getProjectById(projectId);
 
         // Authorization check
-        verifyWorkspaceMembership(project.getWorkspace(), user);
+        verifyProjectMembership(project, user);
 
         project.setName(request.getName());
         project.setDescription(request.getDescription());
@@ -128,10 +152,11 @@ public class ProjectService {
     }
 
     /**
-     * List projects belonging to a workspace.
+     * List projects in a workspace.
      *
-     * Business rule:
-     * Only workspace members can view projects.
+     * Business rule: the caller must be a workspace member, and only sees the
+     * projects whose team they belong to. Projects they are not on the team of
+     * are completely hidden.
      */
     @Transactional(readOnly = true)
     public ApiResponse<List<Project>> listProjects(
@@ -142,14 +167,99 @@ public class ProjectService {
 
         Workspace workspace = getWorkspace(workspaceId);
 
-        // Authorization check
+        // Must belong to the workspace at all...
         verifyWorkspaceMembership(workspace, user);
 
+        // ...but only see the projects whose team they're on.
         List<Project> projects =
-                projectRepository.findByWorkspace(workspace);
+                projectMemberRepository.findProjectsForMember(workspace, user);
 
         return ApiResponse.success(projects);
     }
+
+    // ── Project team management ──────────────────────────────────
+    // Any team member may manage the roster (no owner/admin tier).
+
+    /**
+     * List the members of a project's team. Only team members may view it.
+     */
+    @Transactional(readOnly = true)
+    public ApiResponse<List<ProjectMember>> listProjectMembers(
+            UUID projectId, String email) {
+
+        User user = getUser(email);
+        Project project = getProjectById(projectId);
+
+        verifyProjectMembership(project, user);
+
+        return ApiResponse.success(projectMemberRepository.findByProject(project));
+    }
+
+    /**
+     * Add a member to a project's team.
+     *
+     * The requester must already be on the team (any member may add). The
+     * target must already be a member of the owning workspace — project teams
+     * are drawn from the workspace roster. Idempotent: adding someone already
+     * on the team returns their existing membership.
+     */
+    public ApiResponse<ProjectMember> addProjectMember(
+            UUID projectId, String requesterEmail, String targetEmail) {
+
+        User requester = getUser(requesterEmail);
+        Project project = getProjectById(projectId);
+
+        verifyProjectMembership(project, requester);
+
+        // The target is looked up by email; an unknown address is a client
+        // error (clean 400 "No such user found"), not a server fault (500).
+        User target = userRepository.findByEmail(targetEmail)
+                .orElseThrow(() -> new IllegalArgumentException("No such user found"));
+
+        if (!workspaceMemberRepository.existsByWorkspaceAndUser(project.getWorkspace(), target)) {
+            throw new IllegalArgumentException(
+                    "User must be a member of the workspace before joining a project team");
+        }
+
+        ProjectMember member = projectMemberRepository
+                .findByProjectAndUser(project, target)
+                .orElseGet(() -> addTeamMember(project, target));
+
+        return ApiResponse.success(member);
+    }
+
+    /**
+     * Remove a member from a project's team.
+     *
+     * Any team member may remove another (including themselves), but a project
+     * must keep at least one team member, so the last one cannot be removed.
+     */
+    public ApiResponse<Void> removeProjectMember(
+            UUID projectId, String requesterEmail, String targetEmail) {
+
+        User requester = getUser(requesterEmail);
+        Project project = getProjectById(projectId);
+
+        verifyProjectMembership(project, requester);
+
+        User target = getUser(targetEmail);
+
+        ProjectMember member = projectMemberRepository
+                .findByProjectAndUser(project, target)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "User is not on this project team"));
+
+        if (projectMemberRepository.countByProject(project) <= 1) {
+            throw new IllegalArgumentException(
+                    "A project must have at least one team member");
+        }
+
+        projectMemberRepository.delete(member);
+
+        return ApiResponse.success(null);
+    }
+
+    // ── helpers ──────────────────────────────────────────────────
 
     /**
      * Find a user by email.
@@ -182,10 +292,19 @@ public class ProjectService {
     }
 
     /**
-     * Verify that the authenticated user belongs
-     * to the requested workspace.
-     *
-     * If the user is not a member, return 403 Forbidden.
+     * Add a user to a project's team (no-op-safe callers guard duplicates).
+     */
+    private ProjectMember addTeamMember(Project project, User user) {
+
+        ProjectMember member = new ProjectMember();
+        member.setProject(project);
+        member.setUser(user);
+        return projectMemberRepository.save(member);
+    }
+
+    /**
+     * Verify the authenticated user belongs to the requested workspace.
+     * Used only where workspace-level access is the gate (create/list projects).
      */
     private void verifyWorkspaceMembership(
             Workspace workspace,
@@ -201,6 +320,22 @@ public class ProjectService {
         if (!isMember) {
             throw new AccessDeniedException(
                     "User is not a member of this workspace"
+            );
+        }
+    }
+
+    /**
+     * Verify the authenticated user belongs to the project's team.
+     * This is the authorization boundary for viewing/editing a project.
+     */
+    private void verifyProjectMembership(Project project, User user) {
+
+        boolean isMember =
+                projectMemberRepository.existsByProjectAndUser(project, user);
+
+        if (!isMember) {
+            throw new AccessDeniedException(
+                    "User is not a member of this project team"
             );
         }
     }

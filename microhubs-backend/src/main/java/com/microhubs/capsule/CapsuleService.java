@@ -6,10 +6,9 @@ import com.microhubs.auth.User;
 import com.microhubs.auth.UserRepository;
 import com.microhubs.common.ApiResponse;
 import com.microhubs.project.Project;
+import com.microhubs.project.ProjectMemberRepository;
 import com.microhubs.project.ProjectRepository;
-import com.microhubs.workspace.Workspace;
 import com.microhubs.notification.NotificationService;
-import com.microhubs.workspace.WorkspaceMemberRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,7 +29,7 @@ public class CapsuleService {
     @Autowired
     private UserRepository userRepository;
     @Autowired
-    private WorkspaceMemberRepository workspaceMemberRepository;
+    private ProjectMemberRepository projectMemberRepository;
     @Autowired
     private NotificationService notificationService;
     @Autowired
@@ -61,7 +60,7 @@ public class CapsuleService {
 
     /**
      * Create a new capsule (defaults to OPEN).
-     * Verifies the caller is a member of the workspace that owns the anchor's project.
+     * Verifies the caller is a member of the project team that owns the anchor.
      */
     public ApiResponse<Capsule> createCapsule(String email, CapsuleRequest request) {
         User author = getUser(email);
@@ -69,10 +68,10 @@ public class CapsuleService {
         ArtifactAnchor anchor = artifactAnchorRepository.findById(request.getArtifactAnchorId())
                 .orElseThrow(() -> new RuntimeException("Artifact anchor not found"));
 
-        // Walk the anchor chain to get workspace and verify membership
-        Workspace workspace = anchor.getArtifactVersion()
-                .getArtifact().getProject().getWorkspace();
-        verifyWorkspaceMembership(workspace, author);
+        // Walk the anchor chain to the project and verify team membership
+        Project project = anchor.getArtifactVersion()
+                .getArtifact().getProject();
+        verifyProjectMembership(project, author);
 
         Capsule capsule = new Capsule();
         capsule.setArtifactAnchor(anchor);
@@ -95,7 +94,7 @@ public class CapsuleService {
         User user = getUser(email);
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new RuntimeException("Project not found"));
-        verifyWorkspaceMembership(project.getWorkspace(), user);
+        verifyProjectMembership(project, user);
 
         List<Capsule> capsules;
         String statusName = status != null ? status.name() : null;
@@ -121,7 +120,7 @@ public class CapsuleService {
     public ApiResponse<Capsule> getCapsule(UUID capsuleId, String email) {
         User user = getUser(email);
         Capsule capsule = getCapsuleById(capsuleId);
-        verifyWorkspaceMembership(workspaceOf(capsule), user);
+        verifyProjectMembership(projectOf(capsule), user);
         return ApiResponse.success(capsule);
     }
 
@@ -132,7 +131,7 @@ public class CapsuleService {
             UUID capsuleId, String email, CapsuleUpdateRequest request) {
         User user = getUser(email);
         Capsule capsule = getCapsuleById(capsuleId);
-        verifyWorkspaceMembership(workspaceOf(capsule), user);
+        verifyProjectMembership(projectOf(capsule), user);
 
         // Status transition enforcement
         if (request.getStatus() != null) {
@@ -157,8 +156,8 @@ public class CapsuleService {
         if (request.getReviewerId() != null) {
             User reviewer = userRepository.findById(request.getReviewerId())
                     .orElseThrow(() -> new IllegalArgumentException("No such user found"));
-            // Reviewer must belong to the same workspace as the capsule
-            verifyWorkspaceMembership(workspaceOf(capsule), reviewer);
+            // Reviewer must belong to the same project team as the capsule
+            verifyProjectMembership(projectOf(capsule), reviewer);
             capsule.setReviewer(reviewer);
             // Notify the assigned reviewer
             notificationService.notify(
@@ -215,13 +214,12 @@ public class CapsuleService {
                 .orElseThrow(() -> new RuntimeException("Capsule not found"));
     }
 
-    /** Resolve the owning workspace by walking the anchor → version → artifact → project chain. */
-    private Workspace workspaceOf(Capsule capsule) {
+    /** Resolve the owning project by walking the anchor → version → artifact → project chain. */
+    private Project projectOf(Capsule capsule) {
         return capsule.getArtifactAnchor()
                 .getArtifactVersion()
                 .getArtifact()
-                .getProject()
-                .getWorkspace();
+                .getProject();
     }
 
     /** Serialize a map to a JSON string safely (prevents injection via user-controlled values). */
@@ -233,12 +231,12 @@ public class CapsuleService {
         }
     }
 
-    private void verifyWorkspaceMembership(Workspace workspace, User user) {
-        boolean isMember = workspaceMemberRepository
-                .existsByWorkspaceAndUser(workspace, user);
+    private void verifyProjectMembership(Project project, User user) {
+        boolean isMember = projectMemberRepository
+                .existsByProjectAndUser(project, user);
         if (!isMember) {
             throw new AccessDeniedException(
-                    "User is not a member of this workspace");
+                    "User is not a member of this project team");
         }
     }
 }

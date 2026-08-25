@@ -39,9 +39,11 @@ const vscode = __importStar(require("vscode"));
 const api_1 = require("./api");
 const CapsuleTreeProvider_1 = require("./CapsuleTreeProvider");
 const NotificationPoller_1 = require("./NotificationPoller");
+const VensterViewProvider_1 = require("./VensterViewProvider");
 let api;
 let treeProvider;
 let poller;
+let vensterProvider;
 async function activate(context) {
     // ── API setup ─────────────────────────────────────────────
     const getConfig = () => vscode.workspace.getConfiguration("microhubs").get("baseUrl", "http://localhost:8082");
@@ -51,6 +53,22 @@ async function activate(context) {
     if (storedToken) {
         api.setToken(storedToken);
     }
+    // ── Venster React webview (sidebar) ───────────────────────
+    vensterProvider = new VensterViewProvider_1.VensterViewProvider(context.extensionUri, api, async (token) => {
+        // Persist auth changes coming from the React UI into SecretStorage and
+        // keep the native tree/poller in sync.
+        if (token) {
+            await context.secrets.store("microhubs.token", token);
+            treeProvider.refresh();
+            poller.start(30000);
+        }
+        else {
+            await context.secrets.delete("microhubs.token");
+            treeProvider.refresh();
+            poller.stop();
+        }
+    });
+    context.subscriptions.push(vscode.window.registerWebviewViewProvider(VensterViewProvider_1.VensterViewProvider.viewId, vensterProvider));
     // ── Tree view ─────────────────────────────────────────────
     treeProvider = new CapsuleTreeProvider_1.CapsuleTreeProvider(api);
     vscode.window.registerTreeDataProvider("microhubs.capsules", treeProvider);
@@ -80,6 +98,7 @@ async function activate(context) {
             vscode.window.showInformationMessage(`Micro-Hubs: Logged in as ${email}`);
             treeProvider.refresh();
             poller.start(30000);
+            vensterProvider.postAuthState();
         }
         catch (err) {
             vscode.window.showErrorMessage(`Micro-Hubs: Login failed — ${err.message}`);
@@ -92,6 +111,7 @@ async function activate(context) {
         vscode.window.showInformationMessage("Micro-Hubs: Logged out");
         treeProvider.refresh();
         poller.stop();
+        vensterProvider.postAuthState();
     }));
     // Create Capsule from Selection
     context.subscriptions.push(vscode.commands.registerCommand("microhubs.createCapsule", async () => {
@@ -158,7 +178,12 @@ async function activate(context) {
     // View Capsules for Current File
     context.subscriptions.push(vscode.commands.registerCommand("microhubs.viewCapsules", async (item) => {
         if (item) {
-            // Open capsule detail
+            // Preferred: open the capsule inside the Venster React webview.
+            const openedInVenster = await vensterProvider.revealRoute(`/capsules/${item.capsule.id}`);
+            if (openedInVenster) {
+                return;
+            }
+            // Fallback: static HTML panel (used before the webview has resolved).
             const cap = item.capsule;
             const panel = vscode.window.createWebviewPanel("capsuleDetail", `Capsule: ${cap.title}`, vscode.ViewColumn.One, { enableScripts: false });
             const comments = await api.listComments(cap.id);
@@ -256,6 +281,14 @@ async function activate(context) {
     context.subscriptions.push(vscode.commands.registerCommand("microhubs.refreshCapsules", () => {
         treeProvider.refresh();
         vscode.window.showInformationMessage("Micro-Hubs: Capsule list refreshed");
+    }));
+    // Open the Venster React UI (focus the sidebar webview)
+    context.subscriptions.push(vscode.commands.registerCommand("microhubs.openVenster", async () => {
+        await vscode.commands.executeCommand("microhubs.venster.focus");
+    }));
+    // Create a capsule via the Venster React UI, prefilled with editor context
+    context.subscriptions.push(vscode.commands.registerCommand("microhubs.createCapsuleInVenster", async () => {
+        await vensterProvider.notifyNewCapsule();
     }));
     // Search Knowledge
     context.subscriptions.push(vscode.commands.registerCommand("microhubs.searchKnowledge", async () => {

@@ -5,6 +5,7 @@ import type {
   KnowledgeItem,
   KnowledgeAnswer,
   ExternalKnowledgeItem,
+  ExternalKnowledgeDetail,
   ExternalSearchResult,
 } from "../types";
 import KnowledgeCard from "../components/KnowledgeCard";
@@ -15,9 +16,7 @@ const CATEGORIES = [
   "CONFIGURATION", "TESTING", "DOCUMENTATION",
 ];
 
-type Scope = "mine" | "global";
 type Sort = "relevance" | "newest" | "confidence";
-type SourceMode = "internal" | "stackoverflow";
 
 const SORTS: { value: Sort; label: string }[] = [
   { value: "relevance", label: "Relevance" },
@@ -25,86 +24,283 @@ const SORTS: { value: Sort; label: string }[] = [
   { value: "confidence", label: "Confidence" },
 ];
 
-// External-source result card (Stack Overflow now; SOFA later). Reuses the
-// "IDE gutter" accent-bar motif but always links OUT — this is not team data,
-// so there is nothing to redact. Left bar goes green when the question is
-// answered, matching the app's resolved-status color.
-function ExternalResultCard({ item }: { item: ExternalKnowledgeItem }) {
+// Renders server-converted plain text where fenced ``` segments are code blocks
+// and `backticks` are inline code. We split on the delimiters and place each
+// piece in a plain-text node — deliberately NO dangerouslySetInnerHTML, so a
+// malicious external body can never inject markup into our page.
+function renderInlineCode(text: string) {
+  return text.split("`").map((part, i) =>
+    i % 2 === 1 ? (
+      <code
+        key={i}
+        className="px-1 py-0.5 rounded text-[11px] font-mono"
+        style={{ backgroundColor: "var(--color-bg-card)", color: "var(--color-accent)" }}
+      >
+        {part}
+      </code>
+    ) : (
+      <span key={i}>{part}</span>
+    )
+  );
+}
+
+function CodeAwareText({ text }: { text: string }) {
+  if (!text || !text.trim()) {
+    return (
+      <p className="text-xs italic" style={{ color: "var(--color-text-muted)" }}>
+        No content.
+      </p>
+    );
+  }
+  const segments = text.split("```");
   return (
-    <a
-      href={item.url}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="group relative block rounded-xl border p-4 pl-5 overflow-hidden transition-all hover:-translate-y-0.5"
-      style={{ backgroundColor: "var(--color-bg-card)", borderColor: "var(--color-border)" }}
+    <div className="space-y-2">
+      {segments.map((seg, i) => {
+        const trimmed = seg.replace(/^\n+|\n+$/g, "");
+        if (i % 2 === 1) {
+          // Odd segments are fenced code blocks.
+          return (
+            <pre
+              key={i}
+              className="rounded-lg p-3 text-[11px] font-mono overflow-x-auto whitespace-pre leading-relaxed"
+              style={{
+                backgroundColor: "var(--color-bg-input)",
+                color: "var(--color-text-primary)",
+                border: "1px solid var(--color-border)",
+              }}
+            >
+              {trimmed}
+            </pre>
+          );
+        }
+        // Even segments are prose (with possible inline `code`).
+        if (!trimmed) return null;
+        return (
+          <p
+            key={i}
+            className="text-xs leading-relaxed whitespace-pre-wrap"
+            style={{ color: "var(--color-text-secondary)" }}
+          >
+            {renderInlineCode(trimmed)}
+          </p>
+        );
+      })}
+    </div>
+  );
+}
+
+// External-source result card (Stack Overflow now; SOFA later). Reuses the
+// "IDE gutter" accent-bar motif, but instead of linking OUT it expands INLINE:
+// clicking it lazy-loads the question body + top answers from the backend proxy
+// and shows them right here, so the user never has to leave the app. A subtle
+// "view full thread" link into the source stays available in the expanded panel.
+// Left bar goes green when the question is answered (resolved-status color).
+function ExternalResultCard({ item }: { item: ExternalKnowledgeItem }) {
+  const [expanded, setExpanded] = useState(false);
+  const [detail, setDetail] = useState<ExternalKnowledgeDetail | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [detailError, setDetailError] = useState("");
+
+  const toggle = () => {
+    const next = !expanded;
+    setExpanded(next);
+    // Lazy-load detail the first time it opens; cache it thereafter.
+    if (next && !detail && !loading && item.id) {
+      setLoading(true);
+      setDetailError("");
+      knowledgeApi
+        .externalDetail({ id: item.id, source: item.source })
+        .then((d) => setDetail(d))
+        .catch((err: any) =>
+          setDetailError(err?.message || "Couldn't load this result.")
+        )
+        .finally(() => setLoading(false));
+    }
+  };
+
+  const barColor = item.answered
+    ? "var(--color-status-resolved)"
+    : "var(--color-border-hover)";
+
+  return (
+    <div
+      className="relative rounded-xl border overflow-hidden transition-all"
+      style={{
+        backgroundColor: "var(--color-bg-card)",
+        borderColor: expanded ? "var(--color-accent)" : "var(--color-border)",
+      }}
     >
       <span
         className="absolute left-0 top-0 bottom-0 w-[3px]"
-        style={{ backgroundColor: item.answered ? "var(--color-status-resolved)" : "var(--color-border-hover)" }}
+        style={{ backgroundColor: barColor }}
         aria-hidden="true"
       />
-      <div className="flex items-start justify-between gap-3">
-        <h3 className="font-display text-sm font-semibold leading-snug" style={{ color: "var(--color-text-primary)" }}>
-          {item.title}
-        </h3>
-        <Icon
-          name="externalLink"
-          size={14}
-          className="shrink-0 mt-0.5 transition-transform group-hover:translate-x-0.5"
-          style={{ color: "var(--color-text-muted)" }}
-        />
-      </div>
 
-      {item.snippet && (
-        <p className="text-xs mt-1.5 leading-relaxed line-clamp-2" style={{ color: "var(--color-text-secondary)" }}>
-          {item.snippet}
-        </p>
-      )}
+      {/* Header row — click to expand/collapse inline */}
+      <button
+        onClick={toggle}
+        aria-expanded={expanded}
+        className="w-full text-left p-4 pl-5 transition-all hover:opacity-95"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <h3 className="font-display text-sm font-semibold leading-snug" style={{ color: "var(--color-text-primary)" }}>
+            {item.title}
+          </h3>
+          <Icon
+            name={loading ? "spinner" : "chevronRight"}
+            size={14}
+            className={`shrink-0 mt-0.5 transition-transform ${
+              loading ? "animate-spin" : expanded ? "rotate-90" : ""
+            }`}
+            style={{ color: expanded ? "var(--color-accent)" : "var(--color-text-muted)" }}
+          />
+        </div>
 
-      <div className="flex items-center flex-wrap gap-x-3 gap-y-1.5 mt-2.5">
-        {typeof item.score === "number" && (
-          <span className="inline-flex items-center gap-1 text-[11px] font-mono" style={{ color: "var(--color-text-muted)" }}>
-            <Icon name="arrowUp" size={11} style={{ color: "var(--color-accent)" }} />
-            {item.score}
-          </span>
+        {/* Snippet only while collapsed (the expanded view shows the full body) */}
+        {!expanded && item.snippet && (
+          <p className="text-xs mt-1.5 leading-relaxed line-clamp-2" style={{ color: "var(--color-text-secondary)" }}>
+            {item.snippet}
+          </p>
         )}
-        {typeof item.answerCount === "number" && (
-          <span
-            className="inline-flex items-center gap-1 text-[11px] font-mono"
-            style={{ color: item.answered ? "var(--color-status-resolved)" : "var(--color-text-muted)" }}
-          >
-            {item.answered && <Icon name="check" size={11} />}
-            {item.answerCount} {item.answerCount === 1 ? "answer" : "answers"}
-          </span>
-        )}
-        {item.tags && item.tags.length > 0 && (
-          <span className="flex flex-wrap gap-1.5">
-            {item.tags.slice(0, 4).map((tag) => (
-              <span
-                key={tag}
-                className="px-2 py-0.5 rounded text-[10px] font-mono"
-                style={{ backgroundColor: "var(--color-bg-input)", color: "var(--color-text-muted)" }}
+
+        <div className="flex items-center flex-wrap gap-x-3 gap-y-1.5 mt-2.5">
+          {typeof item.score === "number" && (
+            <span className="inline-flex items-center gap-1 text-[11px] font-mono" style={{ color: "var(--color-text-muted)" }}>
+              <Icon name="arrowUp" size={11} style={{ color: "var(--color-accent)" }} />
+              {item.score}
+            </span>
+          )}
+          {typeof item.answerCount === "number" && (
+            <span
+              className="inline-flex items-center gap-1 text-[11px] font-mono"
+              style={{ color: item.answered ? "var(--color-status-resolved)" : "var(--color-text-muted)" }}
+            >
+              {item.answered && <Icon name="check" size={11} />}
+              {item.answerCount} {item.answerCount === 1 ? "answer" : "answers"}
+            </span>
+          )}
+          {item.tags && item.tags.length > 0 && (
+            <span className="flex flex-wrap gap-1.5">
+              {item.tags.slice(0, 4).map((tag) => (
+                <span
+                  key={tag}
+                  className="px-2 py-0.5 rounded text-[10px] font-mono"
+                  style={{ backgroundColor: "var(--color-bg-input)", color: "var(--color-text-muted)" }}
+                >
+                  {tag}
+                </span>
+              ))}
+            </span>
+          )}
+        </div>
+      </button>
+
+      {/* Expanded detail panel — question body + top answers, inline */}
+      {expanded && (
+        <div className="px-5 pb-4 border-t" style={{ borderColor: "var(--color-border)" }}>
+          {loading ? (
+            <p className="text-xs py-3.5 font-mono" style={{ color: "var(--color-text-muted)" }}>
+              Loading question &amp; answers…
+            </p>
+          ) : detailError ? (
+            <div className="py-3.5">
+              <p className="text-xs mb-2" style={{ color: "var(--color-danger)" }}>{detailError}</p>
+              <a
+                href={item.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-xs font-mono font-medium transition-all hover:opacity-80"
+                style={{ color: "var(--color-accent)" }}
               >
-                {tag}
-              </span>
-            ))}
-          </span>
-        )}
-      </div>
-    </a>
+                Open on Stack Overflow <Icon name="externalLink" size={11} />
+              </a>
+            </div>
+          ) : detail ? (
+            <div className="pt-3.5 space-y-4">
+              {/* Question body */}
+              <div>
+                <div className="eyebrow mb-1.5" style={{ color: "var(--color-text-muted)" }}>Question</div>
+                <CodeAwareText text={detail.body} />
+              </div>
+
+              {/* Top answers */}
+              {detail.answers && detail.answers.length > 0 ? (
+                <div className="space-y-3">
+                  <div className="eyebrow" style={{ color: "var(--color-text-muted)" }}>
+                    {detail.answers.length === 1 ? "Top answer" : `Top ${detail.answers.length} answers`}
+                  </div>
+                  {detail.answers.map((ans, i) => (
+                    <div
+                      key={i}
+                      className="relative rounded-lg border p-3 pl-4"
+                      style={{
+                        backgroundColor: "var(--color-bg-input)",
+                        borderColor: ans.accepted ? "var(--color-status-resolved)" : "var(--color-border)",
+                      }}
+                    >
+                      <span
+                        className="absolute left-0 top-0 bottom-0 w-[2px] rounded-full"
+                        style={{ backgroundColor: ans.accepted ? "var(--color-status-resolved)" : "var(--color-border-hover)" }}
+                        aria-hidden="true"
+                      />
+                      <div className="flex items-center gap-2.5 mb-1.5">
+                        {ans.accepted && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-mono font-semibold uppercase tracking-wider" style={{ color: "var(--color-status-resolved)" }}>
+                            <Icon name="check" size={11} /> Accepted
+                          </span>
+                        )}
+                        {typeof ans.score === "number" && (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-mono" style={{ color: "var(--color-text-muted)" }}>
+                            <Icon name="arrowUp" size={11} style={{ color: "var(--color-accent)" }} /> {ans.score}
+                          </span>
+                        )}
+                      </div>
+                      <CodeAwareText text={ans.body} />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs font-mono" style={{ color: "var(--color-text-muted)" }}>
+                  No answers on this question yet.
+                </p>
+              )}
+
+              {/* Subtle fallback into the source — inline content is self-sufficient */}
+              <a
+                href={item.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-[11px] font-mono font-medium transition-all hover:opacity-80"
+                style={{ color: "var(--color-accent)" }}
+              >
+                View full thread on Stack Overflow <Icon name="externalLink" size={11} />
+              </a>
+            </div>
+          ) : (
+            // No id to expand (e.g. a source without detail support) — link out.
+            <div className="py-3.5">
+              <a
+                href={item.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-xs font-mono font-medium transition-all hover:opacity-80"
+                style={{ color: "var(--color-accent)" }}
+              >
+                Open on Stack Overflow <Icon name="externalLink" size={11} />
+              </a>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
 export default function KnowledgeSearchPage() {
   const [query, setQuery] = useState("");
-  const [scope, setScope] = useState<Scope>("mine");
   const [category, setCategory] = useState("ALL");
   const [tags, setTags] = useState("");
   const [sort, setSort] = useState<Sort>("relevance");
-
-  // Which knowledge source is active. "internal" = our team's knowledge base
-  // (with AI answer); "stackoverflow" = external public SO. The two never mix.
-  const [source, setSource] = useState<SourceMode>("internal");
 
   const [results, setResults] = useState<KnowledgeItem[]>([]);
   const [selected, setSelected] = useState<KnowledgeItem | null>(null);
@@ -119,51 +315,25 @@ export default function KnowledgeSearchPage() {
   const [externalResult, setExternalResult] = useState<ExternalSearchResult | null>(null);
   const [externalLoading, setExternalLoading] = useState(false);
 
-  // Runs the active source's search. For "internal" it fires the team search +
-  // AI answer in parallel (results never wait on the LLM). For an external
-  // source it hits the backend proxy and skips the AI answer entirely. `opts`
-  // lets callers switch scope/source and search in one go, before state flushes.
-  const runSearch = (opts?: { scope?: Scope; source?: SourceMode }) => {
-    const effSource = opts?.source ?? source;
-    if (opts?.source && opts.source !== source) setSource(opts.source);
+  // One unified search. The AI answer, your-workspace matches, and Stack
+  // Overflow references all fire in PARALLEL — the list never waits on the LLM,
+  // and Stack Overflow is a best-effort companion whose failure never blocks the
+  // page or surfaces an error (the section just stays empty).
+  const runSearch = () => {
     if (!query.trim()) return;
 
     setSearched(true);
     setSelected(null);
     setError("");
 
-    // ── External source (Stack Overflow / SOFA): link-out results, no AI answer ──
-    if (effSource !== "internal") {
-      setResults([]);
-      setAnswer(null);
-      setAnswerLoading(false);
-      setExternalResult(null);
-      setExternalLoading(true);
-      knowledgeApi
-        .externalSearch({
-          q: query,
-          source: effSource,
-          tags: tags.trim() || undefined,
-        })
-        .then((res) => setExternalResult(res))
-        .catch((err: any) => {
-          setError(err.message || "Search failed");
-          setExternalResult(null);
-        })
-        .finally(() => setExternalLoading(false));
-      return;
-    }
-
-    // ── Internal team knowledge: semantic search + parallel AI answer ──
-    if (opts?.scope && opts.scope !== scope) setScope(opts.scope);
-    const effScope = opts?.scope ?? scope;
     const params = {
       q: query,
-      scope: effScope,
+      scope: "mine",
       category: category === "ALL" ? undefined : category,
       tags: tags.trim() || undefined,
     };
 
+    // Your team's resolved issues (semantic search).
     setLoading(true);
     knowledgeApi
       .search(params)
@@ -182,20 +352,19 @@ export default function KnowledgeSearchPage() {
       .then((data) => setAnswer(data))
       .catch(() => setAnswer(null))
       .finally(() => setAnswerLoading(false));
-  };
 
-  // Switching source re-runs the query against the new source (never mixes).
-  const changeSource = (s: SourceMode) => {
-    if (s === source) return;
-    setSource(s);
-    setError("");
-    if (searched && query.trim()) runSearch({ source: s });
-  };
-
-  const changeScope = (s: Scope) => {
-    if (s === scope) return;
-    setScope(s);
-    if (searched && query.trim()) runSearch({ scope: s });
+    // Stack Overflow references — best-effort; never blocks or errors the page.
+    setExternalResult(null);
+    setExternalLoading(true);
+    knowledgeApi
+      .externalSearch({
+        q: query,
+        source: "stackoverflow",
+        tags: tags.trim() || undefined,
+      })
+      .then((res) => setExternalResult(res))
+      .catch(() => setExternalResult(null))
+      .finally(() => setExternalLoading(false));
   };
 
   // Sorting is client-side so changing it re-orders instantly (no refetch).
@@ -344,8 +513,7 @@ export default function KnowledgeSearchPage() {
   }
 
   // ── Search view ────────────────────────────────────────────
-  const scopeLabel = scope === "mine" ? "your workspaces" : "the global community";
-  const busy = source === "internal" ? loading : externalLoading;
+  const busy = loading || answerLoading;
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
@@ -356,56 +524,9 @@ export default function KnowledgeSearchPage() {
           Knowledge Search
         </h1>
         <p className="text-sm mt-1.5 max-w-2xl leading-relaxed" style={{ color: "var(--color-text-secondary)" }}>
-          {source === "internal"
-            ? "Ask a question or search resolved issues by meaning — the AI answers from your team's knowledge and cites its sources."
-            : "Search public Stack Overflow for related issues and solutions. Results open on stackoverflow.com in a new tab."}
+          Ask a question — the AI drafts an answer from your team's resolved issues, with similar Stack Overflow threads below.
         </p>
       </div>
-
-      {/* Source toggle — switch the whole result set between our team's
-          knowledge base and an external source. The two never mix. Add an
-          "Agents (SOFA)" option here once SOFA_API_KEY is configured. */}
-      <div className="inline-flex rounded-lg border p-0.5" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-bg-card)" }}>
-        {([
-          { value: "internal" as SourceMode, label: "Our knowledge", icon: "knowledge" as const },
-          { value: "stackoverflow" as SourceMode, label: "Stack Overflow", icon: "globe" as const },
-        ]).map((s) => (
-          <button
-            key={s.value}
-            onClick={() => changeSource(s.value)}
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-md text-xs font-medium font-mono transition-all"
-            style={{
-              backgroundColor: source === s.value ? "var(--color-accent)" : "transparent",
-              color: source === s.value ? "#000" : "var(--color-text-secondary)",
-            }}
-          >
-            <Icon name={s.icon} size={13} />
-            {s.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Scope toggle — internal knowledge only (external sources have no scope) */}
-      {source === "internal" && (
-        <div className="inline-flex rounded-lg border p-0.5" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-bg-card)" }}>
-          {([
-            { value: "mine" as Scope, label: "My workspaces" },
-            { value: "global" as Scope, label: "Global community" },
-          ]).map((s) => (
-            <button
-              key={s.value}
-              onClick={() => changeScope(s.value)}
-              className="px-3.5 py-1.5 rounded-md text-xs font-medium font-mono transition-all"
-              style={{
-                backgroundColor: scope === s.value ? "var(--color-accent)" : "transparent",
-                color: scope === s.value ? "#000" : "var(--color-text-secondary)",
-              }}
-            >
-              {s.label}
-            </button>
-          ))}
-        </div>
-      )}
 
       {/* Search bar */}
       <div className="flex gap-2">
@@ -419,11 +540,7 @@ export default function KnowledgeSearchPage() {
           </span>
           <input
             type="text"
-            placeholder={
-              source === "internal"
-                ? "Ask a question, e.g. “why do our webhooks time out under load?”"
-                : "Search Stack Overflow, e.g. “react useEffect infinite loop”"
-            }
+            placeholder="Ask a question, e.g. “why do our webhooks time out under load?”"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && runSearch()}
@@ -460,53 +577,48 @@ export default function KnowledgeSearchPage() {
             color: "var(--color-text-primary)",
           }}
         />
-        {/* Sort re-orders the internal result list client-side; external
-            results arrive relevance-ranked, so hide it for those. */}
-        {source === "internal" && (
-          <div className="flex items-center gap-2">
-            <span className="eyebrow" style={{ color: "var(--color-text-muted)" }}>Sort</span>
-            <select
-              value={sort}
-              onChange={(e) => setSort(e.target.value as Sort)}
-              className="rounded-lg px-3 py-2 text-xs border outline-none focus:ring-1 transition-theme cursor-pointer"
-              style={{
-                backgroundColor: "var(--color-bg-input)",
-                borderColor: "var(--color-border)",
-                color: "var(--color-text-primary)",
-              }}
-            >
-              {SORTS.map((s) => (
-                <option key={s.value} value={s.value}>{s.label}</option>
-              ))}
-            </select>
-          </div>
-        )}
+        {/* Sort re-orders your-workspace matches client-side (no refetch). */}
+        <div className="flex items-center gap-2">
+          <span className="eyebrow" style={{ color: "var(--color-text-muted)" }}>Sort</span>
+          <select
+            value={sort}
+            onChange={(e) => setSort(e.target.value as Sort)}
+            className="rounded-lg px-3 py-2 text-xs border outline-none focus:ring-1 transition-theme cursor-pointer"
+            style={{
+              backgroundColor: "var(--color-bg-input)",
+              borderColor: "var(--color-border)",
+              color: "var(--color-text-primary)",
+            }}
+          >
+            {SORTS.map((s) => (
+              <option key={s.value} value={s.value}>{s.label}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
-      {/* Category filter — internal knowledge only */}
-      {source === "internal" && (
-        <div className="flex gap-1 flex-wrap">
-          {CATEGORIES.map((c) => (
-            <button
-              key={c}
-              onClick={() => {
-                setCategory(c);
-                if (searched && query.trim()) runSearch();
-              }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium font-mono transition-all ${
-                category === c ? "border" : "border opacity-70 hover:opacity-100"
-              }`}
-              style={{
-                backgroundColor: category === c ? "var(--color-accent-dim)" : "var(--color-bg-card)",
-                borderColor: category === c ? "var(--color-accent)" : "var(--color-border)",
-                color: category === c ? "var(--color-accent)" : "var(--color-text-secondary)",
-              }}
-            >
-              {c}
-            </button>
-          ))}
-        </div>
-      )}
+      {/* Category filter for your-workspace matches */}
+      <div className="flex gap-1 flex-wrap">
+        {CATEGORIES.map((c) => (
+          <button
+            key={c}
+            onClick={() => {
+              setCategory(c);
+              if (searched && query.trim()) runSearch();
+            }}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium font-mono transition-all ${
+              category === c ? "border" : "border opacity-70 hover:opacity-100"
+            }`}
+            style={{
+              backgroundColor: category === c ? "var(--color-accent-dim)" : "var(--color-bg-card)",
+              borderColor: category === c ? "var(--color-accent)" : "var(--color-border)",
+              color: category === c ? "var(--color-accent)" : "var(--color-text-secondary)",
+            }}
+          >
+            {c}
+          </button>
+        ))}
+      </div>
 
       {error && (
         <div className="rounded-lg p-3 border text-sm" style={{ backgroundColor: "rgba(239,68,68,0.1)", borderColor: "var(--color-danger)", color: "var(--color-danger)" }}>
@@ -514,9 +626,9 @@ export default function KnowledgeSearchPage() {
         </div>
       )}
 
-      {/* AI answer panel — violet-accented, footnote-style citations.
-          Internal knowledge only; external sources link straight out. */}
-      {source === "internal" && searched && answerLoading && (
+      {/* AI answer panel — violet-accented, the primary result. Drafted from
+          your team's resolved issues; Stack Overflow references sit below. */}
+      {searched && answerLoading && (
         <div
           className="relative overflow-hidden rounded-xl p-5 border animate-pulse"
           style={{ backgroundColor: "rgba(167,139,250,0.06)", borderColor: "var(--color-status-answered)" }}
@@ -534,7 +646,7 @@ export default function KnowledgeSearchPage() {
         </div>
       )}
 
-      {source === "internal" && searched && !answerLoading && answer?.hasAnswer && answer.answer && (
+      {searched && !answerLoading && answer?.hasAnswer && answer.answer && (
         <div
           className="relative overflow-hidden rounded-xl p-5 border"
           style={{ backgroundColor: "rgba(167,139,250,0.06)", borderColor: "var(--color-status-answered)" }}
@@ -550,131 +662,101 @@ export default function KnowledgeSearchPage() {
             {answer.answer}
           </p>
 
-          {answer.citations && answer.citations.length > 0 && (
-            <div className="mt-4 pt-3 border-t ml-2" style={{ borderColor: "var(--color-border)" }}>
-              <h3 className="eyebrow mb-2" style={{ color: "var(--color-text-muted)" }}>Sources</h3>
-              <div className="space-y-1.5">
-                {answer.citations.map((c, i) => (
-                  <button
-                    key={c.id}
-                    onClick={() => setSelected(c)}
-                    className="w-full text-left flex items-start gap-2.5 rounded-lg px-2.5 py-2 transition-all hover:opacity-80"
-                    style={{ backgroundColor: "var(--color-bg-input)" }}
-                  >
-                    <span
-                      className="text-[11px] font-mono font-semibold shrink-0 mt-px px-1.5 rounded"
-                      style={{ backgroundColor: "rgba(167,139,250,0.15)", color: "var(--color-status-answered)" }}
-                    >
-                      {i + 1}
-                    </span>
-                    <span className="text-xs flex-1 min-w-0" style={{ color: "var(--color-text-secondary)" }}>{c.title}</span>
-                    <span className="text-[10px] font-mono shrink-0" style={{ color: "var(--color-text-muted)" }}>{c.category}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
           <p className="text-[10px] font-mono mt-3 pl-2" style={{ color: "var(--color-text-muted)" }}>
             Generated from your team's resolved issues. Verify before relying on it.
           </p>
         </div>
       )}
 
-      {/* Results — external sources render their own branch; internal keeps
-          the semantic-match list + AI answer above. The two never mix. */}
-      {source !== "internal" ? (
-        externalLoading ? (
-          <div className="text-sm text-center py-12" style={{ color: "var(--color-text-muted)" }}>
-            Searching Stack Overflow...
-          </div>
-        ) : !searched ? (
-          <div className="text-center py-12" style={{ color: "var(--color-text-muted)" }}>
-            <p className="text-sm mb-1" style={{ color: "var(--color-text-secondary)" }}>Search Stack Overflow for a problem</p>
-            <p className="text-xs">Public questions and answers — each result opens on Stack Overflow in a new tab</p>
-          </div>
-        ) : externalResult && !externalResult.configured ? (
-          <div className="text-center py-12">
-            <p className="text-sm mb-1" style={{ color: "var(--color-text-secondary)" }}>Stack Overflow isn't connected yet</p>
-            <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-              {externalResult.message || "This source needs to be configured on the server before it can be searched."}
-            </p>
-          </div>
-        ) : !externalResult || externalResult.items.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-sm mb-1" style={{ color: "var(--color-text-secondary)" }}>No results on Stack Overflow</p>
-            <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-              {externalResult?.message || "Try broader wording or different keywords."}
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-2.5">
-            <div className="flex items-center justify-between px-1">
-              <span className="text-xs font-mono" style={{ color: "var(--color-text-muted)" }}>
-                {externalResult.items.length} {externalResult.items.length === 1 ? "result" : "results"} on Stack Overflow
-              </span>
-              <span className="text-[10px] font-mono flex items-center gap-1" style={{ color: "var(--color-text-muted)" }}>
-                <Icon name="externalLink" size={11} /> opens in new tab
-              </span>
-            </div>
-            {externalResult.items.map((item) => (
-              <ExternalResultCard key={item.url} item={item} />
-            ))}
-          </div>
-        )
-      ) : loading ? (
-        <div className="text-sm text-center py-12" style={{ color: "var(--color-text-muted)" }}>
-          Searching knowledge base...
-        </div>
-      ) : !searched ? (
+      {/* Empty state — before the first search */}
+      {!searched ? (
         <div className="text-center py-12" style={{ color: "var(--color-text-muted)" }}>
-          <p className="text-sm mb-1" style={{ color: "var(--color-text-secondary)" }}>Ask a question to search {scopeLabel}</p>
-          <p className="text-xs">Matches by meaning, not just keywords — and drafts an answer with citations</p>
-        </div>
-      ) : results.length === 0 ? (
-        <div className="text-center py-12">
-          <p className="text-sm mb-1" style={{ color: "var(--color-text-secondary)" }}>
-            No matches in {scopeLabel}
-          </p>
-          <p className="text-xs mb-4" style={{ color: "var(--color-text-muted)" }}>
-            Try broader wording, clear the category filter, or widen your search.
-          </p>
-          <div className="flex gap-2 justify-center flex-wrap">
-            {scope === "mine" && (
-              <button
-                onClick={() => runSearch({ scope: "global" })}
-                className="px-4 py-2 rounded-lg text-xs font-medium font-mono border transition-all hover:opacity-90"
-                style={{ backgroundColor: "var(--color-accent-dim)", borderColor: "var(--color-accent)", color: "var(--color-accent)" }}
-              >
-                Search the global community →
-              </button>
-            )}
-            <Link
-              to="/community"
-              className="px-4 py-2 rounded-lg text-xs font-medium font-mono border transition-all hover:opacity-90"
-              style={{ backgroundColor: "var(--color-bg-card)", borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}
-            >
-              Ask the community →
-            </Link>
-          </div>
+          <p className="text-sm mb-1" style={{ color: "var(--color-text-secondary)" }}>Ask a question to search your knowledge</p>
+          <p className="text-xs">Matches by meaning, not just keywords — the AI drafts an answer, with similar Stack Overflow threads below</p>
         </div>
       ) : (
-        <div className="space-y-2.5">
-          <div className="flex items-center justify-between px-1">
-            <span className="text-xs font-mono" style={{ color: "var(--color-text-muted)" }}>
-              {sortedResults.length} {sortedResults.length === 1 ? "match" : "matches"} in {scopeLabel}
-            </span>
+        <>
+          {/* Your workspace matches — the evidence behind the AI answer */}
+          {loading ? (
+            <div className="text-sm text-center py-8" style={{ color: "var(--color-text-muted)" }}>
+              Searching your knowledge base...
+            </div>
+          ) : results.length === 0 ? (
+            <div className="rounded-xl border p-6 text-center" style={{ backgroundColor: "var(--color-bg-card)", borderColor: "var(--color-border)" }}>
+              <p className="text-sm mb-1" style={{ color: "var(--color-text-secondary)" }}>
+                No matches in your workspaces
+              </p>
+              <p className="text-xs mb-4" style={{ color: "var(--color-text-muted)" }}>
+                Try broader wording or clear the category filter. Similar Stack Overflow threads are below.
+              </p>
+              <div className="flex gap-2 justify-center flex-wrap">
+                <Link
+                  to="/knowledge/global"
+                  className="px-4 py-2 rounded-lg text-xs font-medium font-mono border transition-all hover:opacity-90"
+                  style={{ backgroundColor: "var(--color-accent-dim)", borderColor: "var(--color-accent)", color: "var(--color-accent)" }}
+                >
+                  Browse Community Insights →
+                </Link>
+                <Link
+                  to="/community"
+                  className="px-4 py-2 rounded-lg text-xs font-medium font-mono border transition-all hover:opacity-90"
+                  style={{ backgroundColor: "var(--color-bg-card)", borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}
+                >
+                  Ask the community →
+                </Link>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between px-1">
+                <span className="eyebrow" style={{ color: "var(--color-text-muted)" }}>
+                  Related resolved issues · your workspaces
+                </span>
+                <span className="text-xs font-mono" style={{ color: "var(--color-text-muted)" }}>
+                  {sortedResults.length} {sortedResults.length === 1 ? "match" : "matches"}
+                </span>
+              </div>
+              {sortedResults.map((item, i) => (
+                <KnowledgeCard
+                  key={item.id}
+                  item={item}
+                  index={i}
+                  showPublic={false}
+                  onView={() => setSelected(item)}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Stack Overflow references — similar issues, listed one by one */}
+          <div className="space-y-2.5">
+            <div className="flex items-center justify-between px-1">
+              <span className="eyebrow flex items-center gap-1.5" style={{ color: "var(--color-text-muted)" }}>
+                <Icon name="globe" size={12} /> Similar issues on Stack Overflow
+              </span>
+              {!externalLoading && externalResult && externalResult.configured && externalResult.items.length > 0 && (
+                <span className="text-[10px] font-mono flex items-center gap-1" style={{ color: "var(--color-text-muted)" }}>
+                  <Icon name="chevronRight" size={11} /> click to expand
+                </span>
+              )}
+            </div>
+            {externalLoading ? (
+              <div className="text-sm py-6 text-center" style={{ color: "var(--color-text-muted)" }}>
+                Finding similar issues on Stack Overflow…
+              </div>
+            ) : externalResult && externalResult.configured && externalResult.items.length > 0 ? (
+              externalResult.items.map((item) => (
+                <ExternalResultCard key={item.url} item={item} />
+              ))
+            ) : (
+              <p className="text-xs px-1 pb-2" style={{ color: "var(--color-text-muted)" }}>
+                {externalResult && !externalResult.configured
+                  ? externalResult.message || "Stack Overflow isn't connected on the server."
+                  : "No similar Stack Overflow threads found."}
+              </p>
+            )}
           </div>
-          {sortedResults.map((item, i) => (
-            <KnowledgeCard
-              key={item.id}
-              item={item}
-              index={i}
-              showPublic={scope === "global"}
-              onView={() => setSelected(item)}
-            />
-          ))}
-        </div>
+        </>
       )}
     </div>
   );

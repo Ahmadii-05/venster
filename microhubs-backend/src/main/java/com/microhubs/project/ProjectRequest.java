@@ -4,6 +4,8 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
 import java.time.LocalDate;
+import java.util.List;
+import java.util.UUID;
 
 /**
  * Request body for creating and updating a project.
@@ -31,6 +33,13 @@ public class ProjectRequest {
     private ProjectPriority priority;
 
     private LocalDate targetDate;
+
+    /**
+     * Optional initial team members chosen at creation time. Each id must
+     * belong to a workspace member; ignored on update. The creator is always
+     * added regardless of this list.
+     */
+    private List<UUID> memberIds;
 
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }

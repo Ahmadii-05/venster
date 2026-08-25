@@ -195,14 +195,14 @@ public class SofaKnowledgeProvider implements ExternalKnowledgeProvider {
             }
         }
 
+        String id = firstText(item, "post_id", "postId", "id");
         String link = firstText(item, "link", "url");
         if (link == null || link.isBlank()) {
-            String id = firstText(item, "post_id", "postId", "id");
             link = (id != null) ? baseUrl + "/questions/" + id : baseUrl;
         }
 
         return new ExternalKnowledgeItem(
-                source(), title == null ? "" : title, snippet, link,
+                source(), id, title == null ? "" : title, snippet, link,
                 tagList.toArray(new String[0]), score, answered, answerCount);
     }
 

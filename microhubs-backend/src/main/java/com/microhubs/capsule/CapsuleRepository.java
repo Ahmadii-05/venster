@@ -72,8 +72,9 @@ public interface CapsuleRepository extends JpaRepository<Capsule, UUID> {
     // -- Knowledge Health queries --
 
     /**
-     * Aging capsules in a workspace: non-terminal capsules stuck in their
-     * current status longer than the given threshold (in days).
+     * Aging capsules in a workspace, restricted to projects whose team the
+     * given user belongs to: non-terminal capsules stuck in their current
+     * status longer than the given threshold (in days).
      * Uses updated_at as a proxy for last status change.
      */
     @Query(value = "SELECT DISTINCT ON (c.id) " +
@@ -88,6 +89,8 @@ public interface CapsuleRepository extends JpaRepository<Capsule, UUID> {
             "JOIN artifacts a ON av.artifact_id = a.id " +
             "JOIN projects p ON a.project_id = p.id " +
             "WHERE p.workspace_id = :workspaceId " +
+            "AND EXISTS (SELECT 1 FROM project_members pm " +
+            "            WHERE pm.project_id = p.id AND pm.user_id = :userId) " +
             "AND c.status IN ('OPEN', 'IN_REVIEW', 'ANSWERED') " +
             "AND EXTRACT(EPOCH FROM (NOW() - c.updated_at)) / 86400 > :thresholdDays " +
             "ORDER BY c.id, days_in_status DESC " +
@@ -95,11 +98,13 @@ public interface CapsuleRepository extends JpaRepository<Capsule, UUID> {
             nativeQuery = true)
     List<Object[]> findAgingCapsulesByWorkspace(
             @Param("workspaceId") UUID workspaceId,
+            @Param("userId") UUID userId,
             @Param("thresholdDays") int thresholdDays);
 
     /**
-     * Hot artifacts in a workspace: artifacts with the most capsules attached
-     * to any of their anchors, within the workspace's projects.
+     * Hot artifacts in a workspace, restricted to projects whose team the given
+     * user belongs to: artifacts with the most capsules attached to any of
+     * their anchors, within the workspace's projects.
      * Returns artifactId, filePath, capsuleCount, openCapsuleCount.
      */
     @Query(value = "SELECT " +
@@ -113,10 +118,13 @@ public interface CapsuleRepository extends JpaRepository<Capsule, UUID> {
             "JOIN capsules c ON c.artifact_anchor_id = aa.id " +
             "JOIN projects p ON a.project_id = p.id " +
             "WHERE p.workspace_id = :workspaceId " +
+            "AND EXISTS (SELECT 1 FROM project_members pm " +
+            "            WHERE pm.project_id = p.id AND pm.user_id = :userId) " +
             "GROUP BY a.id, a.file_path " +
             "ORDER BY capsule_count DESC " +
             "LIMIT 10",
             nativeQuery = true)
     List<Object[]> findHotArtifactsByWorkspace(
-            @Param("workspaceId") UUID workspaceId);
+            @Param("workspaceId") UUID workspaceId,
+            @Param("userId") UUID userId);
 }

@@ -8,7 +8,8 @@ import com.microhubs.capsule.CapsuleService;
 import com.microhubs.capsule.CapsuleStatus;
 import com.microhubs.common.ApiResponse;
 import com.microhubs.notification.NotificationService;
-import com.microhubs.workspace.WorkspaceMemberRepository;
+import com.microhubs.project.Project;
+import com.microhubs.project.ProjectMemberRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -30,7 +31,7 @@ public class DiscussionService {
     @Autowired
     private UserRepository userRepository;
     @Autowired
-    private WorkspaceMemberRepository workspaceMemberRepository;
+    private ProjectMemberRepository projectMemberRepository;
     @Autowired
     private NotificationService notificationService;
 
@@ -47,8 +48,8 @@ public class DiscussionService {
         Capsule capsule = capsuleRepository.findById(capsuleId)
                 .orElseThrow(() -> new RuntimeException("Capsule not found"));
 
-        // Verify workspace membership through anchor chain
-        verifyWorkspaceMembership(capsule, author);
+        // Verify project-team membership through anchor chain
+        verifyProjectMembership(capsule, author);
 
         // Auto-transition: OPEN → IN_REVIEW when first comment is posted
         if (capsule.getStatus() == CapsuleStatus.OPEN) {
@@ -87,8 +88,8 @@ public class DiscussionService {
         Capsule capsule = capsuleRepository.findById(capsuleId)
                 .orElseThrow(() -> new RuntimeException("Capsule not found"));
 
-        // Only workspace members may read a capsule's comments
-        verifyWorkspaceMembership(capsule, user);
+        // Only project-team members may read a capsule's comments
+        verifyProjectMembership(capsule, user);
 
         List<Comment> comments = commentRepository
                 .findByCapsuleOrderByCreatedAtAsc(capsule);
@@ -102,19 +103,18 @@ public class DiscussionService {
                 .orElseThrow(() -> new RuntimeException("User not found"));
     }
 
-    private void verifyWorkspaceMembership(Capsule capsule, User user) {
-        // Walk the anchor chain to find workspace
-        var workspace = capsule.getArtifactAnchor()
+    private void verifyProjectMembership(Capsule capsule, User user) {
+        // Walk the anchor chain to find the owning project
+        Project project = capsule.getArtifactAnchor()
                 .getArtifactVersion()
                 .getArtifact()
-                .getProject()
-                .getWorkspace();
+                .getProject();
 
-        boolean isMember = workspaceMemberRepository
-                .existsByWorkspaceAndUser(workspace, user);
+        boolean isMember = projectMemberRepository
+                .existsByProjectAndUser(project, user);
         if (!isMember) {
             throw new AccessDeniedException(
-                    "User is not a member of this workspace");
+                    "User is not a member of this project team");
         }
     }
 }

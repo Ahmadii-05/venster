@@ -31,4 +31,20 @@ public interface ExternalKnowledgeProvider {
      */
     List<ExternalKnowledgeItem> search(String query, String tags, int limit)
             throws ExternalKnowledgeException;
+
+    /**
+     * Fetch full detail (body + top answers) for a single post, so the UI can
+     * expand a result inline instead of sending the user to the external site.
+     *
+     * <p>Default: unsupported. Providers that can serve detail (public Stack
+     * Overflow) override this; others (e.g. SOFA until its detail API is
+     * exercised) inherit the default and {@link ExternalKnowledgeService}
+     * degrades gracefully to a "open on the source" fallback.
+     *
+     * @param id provider post id, from {@link ExternalKnowledgeItem#id()}
+     * @throws ExternalKnowledgeException on upstream/parse failure, or if unsupported
+     */
+    default ExternalKnowledgeDetail detail(String id) throws ExternalKnowledgeException {
+        throw new ExternalKnowledgeException("Detail view is not supported for " + source());
+    }
 }

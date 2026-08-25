@@ -67,6 +67,39 @@ public class ExternalKnowledgeService {
         }
     }
 
+    /**
+     * Fetch full detail (body + top answers) for a single external post so the UI
+     * can expand a result inline. Unlike {@link #search}, a failure here returns an
+     * {@code error} envelope: the card already has a "open on the source" fallback,
+     * so the UI shows that rather than a fake-empty result.
+     */
+    public ApiResponse<ExternalKnowledgeDetail> detail(String source, String id) {
+        if (id == null || id.isBlank()) {
+            return ApiResponse.error("id is required");
+        }
+
+        String key = (source == null || source.isBlank())
+                ? DEFAULT_SOURCE
+                : source.trim().toLowerCase();
+
+        ExternalKnowledgeProvider provider = providers.get(key);
+        if (provider == null) {
+            return ApiResponse.error("Unknown source: " + source);
+        }
+        if (!provider.isConfigured()) {
+            return ApiResponse.error(friendlyNotConfigured(key));
+        }
+
+        try {
+            return ApiResponse.success(provider.detail(id));
+        } catch (ExternalKnowledgeException e) {
+            log.warn("External detail failed for source '{}' id '{}': {}", key, id, e.getMessage());
+            return ApiResponse.error(
+                    prettyLabel(key) + " couldn't load this result. Try opening it on "
+                            + prettyLabel(key) + ".");
+        }
+    }
+
     private String friendlyNotConfigured(String source) {
         if ("sofa".equals(source)) {
             return "Stack Overflow for Agents isn't connected yet. "

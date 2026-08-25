@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
-import { capsuleApi, artifactApi, projectApi } from "../services/api";
+import { capsuleApi, artifactApi, projectApi, workspaceApi } from "../services/api";
 import {
   type Capsule,
   type CapsuleStatus,
@@ -8,10 +8,14 @@ import {
   type Project,
   type ProjectStatus,
   type ProjectPriority,
+  type ProjectMember,
+  type WorkspaceMember,
   STATUS_COLORS,
   PROJECT_STATUS_LABELS,
   PROJECT_STATUS_STYLES,
 } from "../types";
+import Avatar from "../components/ui/Avatar";
+import Icon from "../components/ui/Icon";
 
 const ALL_STATUSES: (CapsuleStatus | "ALL")[] = [
   "ALL",
@@ -50,6 +54,15 @@ export default function ProjectDetailPage() {
   const [editStatus, setEditStatus] = useState<ProjectStatus>("PLANNING");
   const [editPriority, setEditPriority] = useState<ProjectPriority>("MEDIUM");
   const [editTarget, setEditTarget] = useState(""); // yyyy-MM-dd
+
+  // ── Project team state ─────────────────────────────────────
+  // The team is the authorization boundary: only these users can see or act on
+  // the project's capsules. Add-picker is drawn from the workspace roster.
+  const [team, setTeam] = useState<ProjectMember[]>([]);
+  const [teamError, setTeamError] = useState(false);
+  const [wsRoster, setWsRoster] = useState<WorkspaceMember[]>([]);
+  const [showAddTeam, setShowAddTeam] = useState(false);
+  const [teamBusy, setTeamBusy] = useState(false);
 
   // ── Create Capsule state ──────────────────────────────────
   const [showCreate, setShowCreate] = useState(false);
@@ -109,6 +122,40 @@ export default function ProjectDetailPage() {
     fetchProject();
   }, [fetchProject]);
 
+  // Load the project team (the authorization boundary for this project).
+  const fetchTeam = useCallback(async () => {
+    if (!id) return;
+    try {
+      const members = await projectApi.listMembers(id);
+      setTeam(members || []);
+      setTeamError(false);
+    } catch {
+      setTeamError(true);
+    }
+  }, [id]);
+
+  useEffect(() => {
+    fetchTeam();
+  }, [fetchTeam]);
+
+  // Once the project is known, load its workspace roster so the add-picker can
+  // offer workspace members who aren't on the team yet.
+  useEffect(() => {
+    if (!project) return;
+    let active = true;
+    workspaceApi
+      .listMembers(project.workspace.id)
+      .then((roster) => {
+        if (active) setWsRoster(roster || []);
+      })
+      .catch(() => {
+        if (active) setWsRoster([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, [project]);
+
   // Pre-fill the edit form from the loaded project whenever it opens.
   const openEditProject = () => {
     if (project) {
@@ -144,6 +191,40 @@ export default function ProjectDetailPage() {
       setError(err.message || "Failed to update project");
     } finally {
       setSavingProject(false);
+    }
+  };
+
+  // ── Project team management ────────────────────────────────
+  const handleAddTeamMember = async (email: string) => {
+    if (!id) return;
+    setTeamBusy(true);
+    setError("");
+    try {
+      const member = await projectApi.addMember(id, email);
+      setTeam((prev) =>
+        prev.some((m) => m.user.id === member.user.id)
+          ? prev
+          : [...prev, member]
+      );
+    } catch (err: any) {
+      setError(err.message || "Failed to add team member");
+    } finally {
+      setTeamBusy(false);
+    }
+  };
+
+  const handleRemoveTeamMember = async (email: string) => {
+    // A project must keep at least one member; the backend enforces this too.
+    if (!id || team.length <= 1) return;
+    setTeamBusy(true);
+    setError("");
+    try {
+      await projectApi.removeMember(id, email);
+      setTeam((prev) => prev.filter((m) => m.user.email !== email));
+    } catch (err: any) {
+      setError(err.message || "Failed to remove team member");
+    } finally {
+      setTeamBusy(false);
     }
   };
 
@@ -195,6 +276,11 @@ export default function ProjectDetailPage() {
       setCreating(false);
     }
   };
+
+  // Workspace members not yet on the team — the pool the add-picker offers.
+  const addableRoster = wsRoster.filter(
+    (m) => !team.some((t) => t.user.id === m.user.id)
+  );
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
@@ -571,6 +657,127 @@ export default function ProjectDetailPage() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── Project team ──────────────────────────────────── */}
+      {project && (
+        <div
+          className="rounded-xl p-5 border transition-theme space-y-3"
+          style={{
+            backgroundColor: "var(--color-bg-card)",
+            borderColor: "var(--color-border)",
+          }}
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div
+                className="text-[10px] uppercase tracking-widest font-mono"
+                style={{ color: "var(--color-accent)" }}
+              >
+                PROJECT TEAM
+              </div>
+              <p
+                className="text-xs mt-0.5"
+                style={{ color: "var(--color-text-secondary)" }}
+              >
+                Only these members can see and act on this project's capsules.
+              </p>
+            </div>
+            <button
+              onClick={() => setShowAddTeam((v) => !v)}
+              className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all hover:opacity-90"
+              style={{
+                backgroundColor: "var(--color-bg-input)",
+                borderColor: "var(--color-border)",
+                color: "var(--color-text-secondary)",
+              }}
+            >
+              + Add member
+            </button>
+          </div>
+
+          {teamError && (
+            <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+              Couldn't load the team. Make sure the backend is running the
+              latest build, then reload.
+            </p>
+          )}
+
+          {/* Add-picker: workspace members not already on the team */}
+          {showAddTeam &&
+            (addableRoster.length === 0 ? (
+              <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+                Everyone in the workspace is already on this team. Add more
+                people to the workspace first.
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-2 pt-1">
+                {addableRoster.map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    disabled={teamBusy}
+                    onClick={() => handleAddTeamMember(m.user.email)}
+                    className="flex items-center gap-2 rounded-full pl-1 pr-3 py-1 text-xs border transition-all hover:opacity-90 disabled:opacity-50"
+                    style={{
+                      backgroundColor: "var(--color-bg-input)",
+                      borderColor: "var(--color-border)",
+                      color: "var(--color-text-secondary)",
+                    }}
+                  >
+                    <Avatar user={m.user} size="sm" />
+                    <span className="truncate max-w-[10rem]">
+                      {m.user.name || m.user.email.split("@")[0]}
+                    </span>
+                    <Icon name="plus" size={12} />
+                  </button>
+                ))}
+              </div>
+            ))}
+
+          {/* Current team roster */}
+          {team.length === 0
+            ? !teamError && (
+                <p
+                  className="text-xs"
+                  style={{ color: "var(--color-text-muted)" }}
+                >
+                  No team members yet.
+                </p>
+              )
+            : (
+                <div className="flex flex-wrap gap-2">
+                  {team.map((m) => (
+                    <div
+                      key={m.id}
+                      className="flex items-center gap-2 rounded-full pl-1 pr-2 py-1 text-xs border"
+                      style={{
+                        backgroundColor: "var(--color-bg-input)",
+                        borderColor: "var(--color-border)",
+                        color: "var(--color-text-primary)",
+                      }}
+                    >
+                      <Avatar user={m.user} size="sm" />
+                      <span className="truncate max-w-[10rem]">
+                        {m.user.name || m.user.email.split("@")[0]}
+                      </span>
+                      {team.length > 1 && (
+                        <button
+                          type="button"
+                          disabled={teamBusy}
+                          onClick={() => handleRemoveTeamMember(m.user.email)}
+                          title="Remove from team"
+                          className="rounded-full p-0.5 transition-all hover:opacity-70 disabled:opacity-40"
+                          style={{ color: "var(--color-text-muted)" }}
+                        >
+                          <Icon name="close" size={12} />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
         </div>
       )}
 

@@ -112,7 +112,7 @@ class IntegrationTest {
     @BeforeAll
     static void cleanDatabase(@Autowired org.springframework.jdbc.core.JdbcTemplate jdbc) {
         // Clean all test data before suite runs
-        jdbc.execute("TRUNCATE knowledge_items, resolutions, comments, capsules, artifact_anchors, artifact_versions, artifacts, projects, workspace_members, workspaces, notifications, audit_log CASCADE");
+        jdbc.execute("TRUNCATE knowledge_items, resolutions, comments, capsules, artifact_anchors, artifact_versions, artifacts, project_members, projects, workspace_members, workspaces, notifications, audit_log CASCADE");
         jdbc.execute("DELETE FROM users");
     }
 
@@ -238,6 +238,23 @@ class IntegrationTest {
 
         projId = mapper.readTree(projResult.getResponse().getContentAsString())
                 .path("data").path("id").asText();
+
+        // Add User B and User C to the project team. Project-team membership is
+        // now the authorization boundary for a project's capsules, so members
+        // must be on the team to act on it. B is assigned as reviewer in Step 7;
+        // C stays a plain team member and must still be refused resolution.
+        mockMvc.perform(post("/api/projects/" + projId + "/members")
+                        .header("Authorization", "Bearer " + tokenA)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"testb@test.com\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+
+        mockMvc.perform(post("/api/projects/" + projId + "/members")
+                        .header("Authorization", "Bearer " + tokenA)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"testc@test.com\"}"))
+                .andExpect(status().isOk());
     }
 
     // ── Step 3: Non-member gets 403 ──────────────────────────

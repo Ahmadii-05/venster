@@ -87,6 +87,15 @@ export const PROJECT_STATUS_STYLES: Record<ProjectStatus, { bg: string; text: st
   ARCHIVED: { bg: "rgba(107, 114, 128, 0.15)", text: "var(--color-status-archived)" },
 };
 
+// A user on a project's team. Project-team membership is the authorization
+// boundary: only members can see or act on the project's capsules. The team
+// carries no role — every member is equal and any member may manage the roster.
+export interface ProjectMember {
+  id: string;
+  user: User;
+  createdAt: string;
+}
+
 // ── Artifact Chain ────────────────────────────────────────────
 export interface Artifact {
   id: string;
@@ -192,6 +201,7 @@ export type ExternalSource = "stackoverflow" | "sofa";
 
 export interface ExternalKnowledgeItem {
   source: string;
+  id: string | null; // provider post id (SO question_id); powers inline detail fetch
   title: string;
   snippet: string | null;
   url: string;
@@ -208,6 +218,29 @@ export interface ExternalSearchResult {
   configured: boolean;
   message: string | null;
   items: ExternalKnowledgeItem[];
+}
+
+// A single answer on an external post (GET /api/knowledge/external/detail).
+// `body` is server-converted plain text with code as fenced ``` segments.
+export interface ExternalAnswer {
+  body: string;
+  score: number | null;
+  accepted: boolean;
+}
+
+// Full detail for one external result, fetched on demand when a card expands.
+// Lets the app show the question + top answers inline instead of opening the
+// external site. Bodies are plain text (``` fenced code) — safe to render.
+export interface ExternalKnowledgeDetail {
+  source: string;
+  id: string;
+  title: string;
+  body: string;
+  url: string;
+  tags: string[];
+  score: number | null;
+  answered: boolean | null;
+  answers: ExternalAnswer[];
 }
 
 export interface Notification {

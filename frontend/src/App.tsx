@@ -1,7 +1,9 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, MemoryRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import { ThemeProvider } from "./context/ThemeContext";
+import { isInVsCode } from "./services/vscodeBridge";
 import ProtectedRoute from "./components/ProtectedRoute";
+import VsCodeIntegration from "./components/VsCodeIntegration";
 import Layout from "./components/Layout";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
@@ -17,10 +19,15 @@ import NotificationsPage from "./pages/NotificationsPage";
 import ProfilePage from "./pages/ProfilePage";
 
 export default function App() {
+  // MemoryRouter inside VS Code webviews (in-memory location, no real URL
+  // bar); BrowserRouter stays for normal browser development.
+  const Router = isInVsCode ? MemoryRouter : BrowserRouter;
   return (
     <ThemeProvider>
       <AuthProvider>
-        <BrowserRouter>
+        {/* Must live INSIDE the Router: it calls useNavigate(). */}
+        <Router>
+          <VsCodeIntegration />
           <Routes>
             {/* Public routes */}
             <Route path="/login" element={<LoginPage />} />
@@ -128,7 +135,7 @@ export default function App() {
               }
             />
           </Routes>
-        </BrowserRouter>
+        </Router>
       </AuthProvider>
     </ThemeProvider>
   );

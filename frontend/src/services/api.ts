@@ -1,8 +1,10 @@
+import { isInVsCode } from "./vscodeBridge";
 import type {
   LoginResponse,
   Workspace,
   WorkspaceMember,
   Project,
+  ProjectMember,
   ProjectStatus,
   ProjectPriority,
   Artifact,
@@ -17,6 +19,7 @@ import type {
   KnowledgeItem,
   KnowledgeAnswer,
   ExternalSearchResult,
+  ExternalKnowledgeDetail,
   GlobalQuestion,
   GlobalAnswer,
   UserSummary,
@@ -71,7 +74,13 @@ async function request<T>(
 
   if (res.status === 401) {
     clearAuthToken();
-    window.location.href = "/login";
+    // In the browser we can hard-navigate to the SPA's /login route.
+    // Inside the VS Code webview there is no such server route — navigating
+    // would blank the entire webview. The token is cleared above, so the
+    // app's ProtectedRoute renders the login page instead.
+    if (!isInVsCode) {
+      window.location.href = "/login";
+    }
     throw new Error("Unauthorized");
   }
 
@@ -167,6 +176,9 @@ export interface ProjectInput {
   status?: ProjectStatus;
   priority?: ProjectPriority;
   targetDate?: string; // ISO date (yyyy-MM-dd)
+  // Optional teammates (workspace-member ids) to seed the project team with at
+  // creation. The creator is always added automatically by the backend.
+  memberIds?: string[];
 }
 
 export const projectApi = {
@@ -183,6 +195,19 @@ export const projectApi = {
       method: "PATCH",
       body: JSON.stringify(input),
     }),
+  // ── Project team (the authorization boundary) ──
+  listMembers: (projectId: string) =>
+    request<ProjectMember[]>(`/api/projects/${projectId}/members`),
+  addMember: (projectId: string, email: string) =>
+    request<ProjectMember>(`/api/projects/${projectId}/members`, {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    }),
+  removeMember: (projectId: string, email: string) =>
+    request<void>(
+      `/api/projects/${projectId}/members/${encodeURIComponent(email)}`,
+      { method: "DELETE" }
+    ),
 };
 
 // ── Artifact ──────────────────────────────────────────────────
@@ -327,6 +352,14 @@ export const knowledgeApi = {
     if (params.source) q.set("source", params.source);
     if (params.tags) q.set("tags", params.tags);
     return request<ExternalSearchResult>(`/api/knowledge/external?${q.toString()}`);
+  },
+  // Fetch full detail (question body + top answers) for one external result so
+  // it can be expanded inline. Throws (via request) if the source can't load it;
+  // the card falls back to an "open on the source" link in that case.
+  externalDetail: (params: { id: string; source?: string }) => {
+    const q = new URLSearchParams({ id: params.id });
+    if (params.source) q.set("source", params.source);
+    return request<ExternalKnowledgeDetail>(`/api/knowledge/external/detail?${q.toString()}`);
   },
 };
 

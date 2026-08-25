@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
-import { capsuleApi, workspaceApi, knowledgeApi } from "../services/api";
+import { capsuleApi, workspaceApi, projectApi, knowledgeApi } from "../services/api";
 import {
   type Capsule,
   type Comment,
   type CapsuleStatus,
   type CapsulePriority,
   type WorkspaceMember,
+  type ProjectMember,
   type KnowledgeItem,
   ALLOWED_TRANSITIONS,
   STATUS_COLORS,
@@ -28,7 +29,7 @@ export default function CapsuleDetailPage() {
   const [showResolve, setShowResolve] = useState(false);
   const [assigneeQuery, setAssigneeQuery] = useState("");
   const [assigning, setAssigning] = useState(false);
-  const [members, setMembers] = useState<WorkspaceMember[]>([]);
+  const [members, setMembers] = useState<ProjectMember[]>([]);
   const [showAssignDropdown, setShowAssignDropdown] = useState(false);
   const [resolution, setResolution] = useState<any>(null);
   const [membership, setMembership] = useState<WorkspaceMember | null>(null);
@@ -83,20 +84,29 @@ export default function CapsuleDetailPage() {
 
       const workspaceId =
         cap.artifactAnchor?.artifactVersion?.artifact?.project?.workspace?.id;
+      const projectId =
+        cap.artifactAnchor?.artifactVersion?.artifact?.project?.id;
       if (workspaceId && currentEmail) {
         try {
+          // Workspace membership still drives resolve/publish permissions:
+          // only a workspace ADMIN/OWNER (or the assigned reviewer) may resolve,
+          // and only ADMIN/OWNER may publish the generated knowledge item.
           const member = await workspaceApi.getMember(workspaceId, currentEmail);
           setMembership(member);
         } catch {
           // Not a member — membership will remain null
         }
+      }
+      if (projectId) {
         try {
-          // Roster powers the reviewer-assignment dropdown, so we can send a
-          // real user id instead of a free-typed email the backend can't resolve.
-          const roster = await workspaceApi.listMembers(workspaceId);
+          // The reviewer dropdown is drawn from the PROJECT TEAM, not the whole
+          // workspace: capsules are visible and actionable only within the team,
+          // and the backend refuses to assign a reviewer who isn't a team member.
+          // Sending a real user id also avoids the free-typed-email path.
+          const roster = await projectApi.listMembers(projectId);
           setMembers(roster || []);
         } catch {
-          // Couldn't load the roster — the dropdown will simply be empty.
+          // Couldn't load the team — the dropdown will simply be empty.
         }
       }
     } catch (err: any) {
@@ -211,7 +221,7 @@ export default function CapsuleDetailPage() {
   })();
 
   // Assign a specific member as reviewer (sends the user's UUID, not an email).
-  const assignReviewer = async (member: WorkspaceMember) => {
+  const assignReviewer = async (member: ProjectMember) => {
     if (!id) return;
     setAssigning(true);
     setShowAssignDropdown(false);
@@ -646,7 +656,7 @@ export default function CapsuleDetailPage() {
                         if (!knowledgeItem) return;
                         const newVis = knowledgeItem.visibility === "PUBLIC" ? "PRIVATE" : "PUBLIC";
                         if (newVis === "PUBLIC" && !window.confirm(
-                          "Publish to the Global Community?\n\nThis makes the summary (not the code or discussion) visible to all users of the platform."
+                          "Publish to Community Insights?\n\nThis makes the summary (not the code or discussion) visible to all users of the platform."
                         )) return;
                         try {
                           const updated = await knowledgeApi.setVisibility(knowledgeItem.id, newVis);
