@@ -182,6 +182,34 @@ export interface KnowledgeAnswer {
   citations: KnowledgeItem[];
 }
 
+// ── External knowledge (Stack Overflow / SOFA search proxy) ──────
+// Results from a source OUTSIDE the team knowledge base. The backend proxies
+// the call (keeping any API key server-side) and normalizes every source to
+// this one shape so the UI renders a single card. Not team data — always links
+// out, so there is nothing to redact. `source` is currently "stackoverflow";
+// "sofa" (Stack Overflow for Agents) activates once its key is configured.
+export type ExternalSource = "stackoverflow" | "sofa";
+
+export interface ExternalKnowledgeItem {
+  source: string;
+  title: string;
+  snippet: string | null;
+  url: string;
+  tags: string[];
+  score: number | null;
+  answered: boolean | null;
+  answerCount: number | null;
+}
+
+// Envelope: `configured=false` means the source isn't connected yet (show the
+// message); `configured=true` with empty items + a message means it degraded.
+export interface ExternalSearchResult {
+  source: string;
+  configured: boolean;
+  message: string | null;
+  items: ExternalKnowledgeItem[];
+}
+
 export interface Notification {
   id: string;
   user: User;

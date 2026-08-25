@@ -1,7 +1,12 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { knowledgeApi } from "../services/api";
-import type { KnowledgeItem, KnowledgeAnswer } from "../types";
+import type {
+  KnowledgeItem,
+  KnowledgeAnswer,
+  ExternalKnowledgeItem,
+  ExternalSearchResult,
+} from "../types";
 import KnowledgeCard from "../components/KnowledgeCard";
 import Icon from "../components/ui/Icon";
 
@@ -12,6 +17,7 @@ const CATEGORIES = [
 
 type Scope = "mine" | "global";
 type Sort = "relevance" | "newest" | "confidence";
+type SourceMode = "internal" | "stackoverflow";
 
 const SORTS: { value: Sort; label: string }[] = [
   { value: "relevance", label: "Relevance" },
@@ -19,12 +25,86 @@ const SORTS: { value: Sort; label: string }[] = [
   { value: "confidence", label: "Confidence" },
 ];
 
+// External-source result card (Stack Overflow now; SOFA later). Reuses the
+// "IDE gutter" accent-bar motif but always links OUT — this is not team data,
+// so there is nothing to redact. Left bar goes green when the question is
+// answered, matching the app's resolved-status color.
+function ExternalResultCard({ item }: { item: ExternalKnowledgeItem }) {
+  return (
+    <a
+      href={item.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="group relative block rounded-xl border p-4 pl-5 overflow-hidden transition-all hover:-translate-y-0.5"
+      style={{ backgroundColor: "var(--color-bg-card)", borderColor: "var(--color-border)" }}
+    >
+      <span
+        className="absolute left-0 top-0 bottom-0 w-[3px]"
+        style={{ backgroundColor: item.answered ? "var(--color-status-resolved)" : "var(--color-border-hover)" }}
+        aria-hidden="true"
+      />
+      <div className="flex items-start justify-between gap-3">
+        <h3 className="font-display text-sm font-semibold leading-snug" style={{ color: "var(--color-text-primary)" }}>
+          {item.title}
+        </h3>
+        <Icon
+          name="externalLink"
+          size={14}
+          className="shrink-0 mt-0.5 transition-transform group-hover:translate-x-0.5"
+          style={{ color: "var(--color-text-muted)" }}
+        />
+      </div>
+
+      {item.snippet && (
+        <p className="text-xs mt-1.5 leading-relaxed line-clamp-2" style={{ color: "var(--color-text-secondary)" }}>
+          {item.snippet}
+        </p>
+      )}
+
+      <div className="flex items-center flex-wrap gap-x-3 gap-y-1.5 mt-2.5">
+        {typeof item.score === "number" && (
+          <span className="inline-flex items-center gap-1 text-[11px] font-mono" style={{ color: "var(--color-text-muted)" }}>
+            <Icon name="arrowUp" size={11} style={{ color: "var(--color-accent)" }} />
+            {item.score}
+          </span>
+        )}
+        {typeof item.answerCount === "number" && (
+          <span
+            className="inline-flex items-center gap-1 text-[11px] font-mono"
+            style={{ color: item.answered ? "var(--color-status-resolved)" : "var(--color-text-muted)" }}
+          >
+            {item.answered && <Icon name="check" size={11} />}
+            {item.answerCount} {item.answerCount === 1 ? "answer" : "answers"}
+          </span>
+        )}
+        {item.tags && item.tags.length > 0 && (
+          <span className="flex flex-wrap gap-1.5">
+            {item.tags.slice(0, 4).map((tag) => (
+              <span
+                key={tag}
+                className="px-2 py-0.5 rounded text-[10px] font-mono"
+                style={{ backgroundColor: "var(--color-bg-input)", color: "var(--color-text-muted)" }}
+              >
+                {tag}
+              </span>
+            ))}
+          </span>
+        )}
+      </div>
+    </a>
+  );
+}
+
 export default function KnowledgeSearchPage() {
   const [query, setQuery] = useState("");
   const [scope, setScope] = useState<Scope>("mine");
   const [category, setCategory] = useState("ALL");
   const [tags, setTags] = useState("");
   const [sort, setSort] = useState<Sort>("relevance");
+
+  // Which knowledge source is active. "internal" = our team's knowledge base
+  // (with AI answer); "stackoverflow" = external public SO. The two never mix.
+  const [source, setSource] = useState<SourceMode>("internal");
 
   const [results, setResults] = useState<KnowledgeItem[]>([]);
   const [selected, setSelected] = useState<KnowledgeItem | null>(null);
@@ -35,24 +115,54 @@ export default function KnowledgeSearchPage() {
   const [answer, setAnswer] = useState<KnowledgeAnswer | null>(null);
   const [answerLoading, setAnswerLoading] = useState(false);
 
-  // Search + AI answer fire in parallel so results never wait on the LLM.
-  // `opts.scope` lets callers (scope toggle, "search global instead") run a
-  // search against a scope before the state update has flushed.
-  const runSearch = (opts?: { scope?: Scope }) => {
-    if (opts?.scope && opts.scope !== scope) setScope(opts.scope);
-    const effScope = opts?.scope ?? scope;
+  // External-source results (Stack Overflow / SOFA), kept separate from `results`.
+  const [externalResult, setExternalResult] = useState<ExternalSearchResult | null>(null);
+  const [externalLoading, setExternalLoading] = useState(false);
+
+  // Runs the active source's search. For "internal" it fires the team search +
+  // AI answer in parallel (results never wait on the LLM). For an external
+  // source it hits the backend proxy and skips the AI answer entirely. `opts`
+  // lets callers switch scope/source and search in one go, before state flushes.
+  const runSearch = (opts?: { scope?: Scope; source?: SourceMode }) => {
+    const effSource = opts?.source ?? source;
+    if (opts?.source && opts.source !== source) setSource(opts.source);
     if (!query.trim()) return;
 
+    setSearched(true);
+    setSelected(null);
+    setError("");
+
+    // ── External source (Stack Overflow / SOFA): link-out results, no AI answer ──
+    if (effSource !== "internal") {
+      setResults([]);
+      setAnswer(null);
+      setAnswerLoading(false);
+      setExternalResult(null);
+      setExternalLoading(true);
+      knowledgeApi
+        .externalSearch({
+          q: query,
+          source: effSource,
+          tags: tags.trim() || undefined,
+        })
+        .then((res) => setExternalResult(res))
+        .catch((err: any) => {
+          setError(err.message || "Search failed");
+          setExternalResult(null);
+        })
+        .finally(() => setExternalLoading(false));
+      return;
+    }
+
+    // ── Internal team knowledge: semantic search + parallel AI answer ──
+    if (opts?.scope && opts.scope !== scope) setScope(opts.scope);
+    const effScope = opts?.scope ?? scope;
     const params = {
       q: query,
       scope: effScope,
       category: category === "ALL" ? undefined : category,
       tags: tags.trim() || undefined,
     };
-
-    setSearched(true);
-    setSelected(null);
-    setError("");
 
     setLoading(true);
     knowledgeApi
@@ -72,6 +182,14 @@ export default function KnowledgeSearchPage() {
       .then((data) => setAnswer(data))
       .catch(() => setAnswer(null))
       .finally(() => setAnswerLoading(false));
+  };
+
+  // Switching source re-runs the query against the new source (never mixes).
+  const changeSource = (s: SourceMode) => {
+    if (s === source) return;
+    setSource(s);
+    setError("");
+    if (searched && query.trim()) runSearch({ source: s });
   };
 
   const changeScope = (s: Scope) => {
@@ -227,6 +345,7 @@ export default function KnowledgeSearchPage() {
 
   // ── Search view ────────────────────────────────────────────
   const scopeLabel = scope === "mine" ? "your workspaces" : "the global community";
+  const busy = source === "internal" ? loading : externalLoading;
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
@@ -237,29 +356,56 @@ export default function KnowledgeSearchPage() {
           Knowledge Search
         </h1>
         <p className="text-sm mt-1.5 max-w-2xl leading-relaxed" style={{ color: "var(--color-text-secondary)" }}>
-          Ask a question or search resolved issues by meaning — the AI answers from your team's knowledge and cites its sources.
+          {source === "internal"
+            ? "Ask a question or search resolved issues by meaning — the AI answers from your team's knowledge and cites its sources."
+            : "Search public Stack Overflow for related issues and solutions. Results open on stackoverflow.com in a new tab."}
         </p>
       </div>
 
-      {/* Scope toggle */}
+      {/* Source toggle — switch the whole result set between our team's
+          knowledge base and an external source. The two never mix. Add an
+          "Agents (SOFA)" option here once SOFA_API_KEY is configured. */}
       <div className="inline-flex rounded-lg border p-0.5" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-bg-card)" }}>
         {([
-          { value: "mine" as Scope, label: "My workspaces" },
-          { value: "global" as Scope, label: "Global community" },
+          { value: "internal" as SourceMode, label: "Our knowledge", icon: "knowledge" as const },
+          { value: "stackoverflow" as SourceMode, label: "Stack Overflow", icon: "globe" as const },
         ]).map((s) => (
           <button
             key={s.value}
-            onClick={() => changeScope(s.value)}
-            className="px-3.5 py-1.5 rounded-md text-xs font-medium font-mono transition-all"
+            onClick={() => changeSource(s.value)}
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-md text-xs font-medium font-mono transition-all"
             style={{
-              backgroundColor: scope === s.value ? "var(--color-accent)" : "transparent",
-              color: scope === s.value ? "#000" : "var(--color-text-secondary)",
+              backgroundColor: source === s.value ? "var(--color-accent)" : "transparent",
+              color: source === s.value ? "#000" : "var(--color-text-secondary)",
             }}
           >
+            <Icon name={s.icon} size={13} />
             {s.label}
           </button>
         ))}
       </div>
+
+      {/* Scope toggle — internal knowledge only (external sources have no scope) */}
+      {source === "internal" && (
+        <div className="inline-flex rounded-lg border p-0.5" style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-bg-card)" }}>
+          {([
+            { value: "mine" as Scope, label: "My workspaces" },
+            { value: "global" as Scope, label: "Global community" },
+          ]).map((s) => (
+            <button
+              key={s.value}
+              onClick={() => changeScope(s.value)}
+              className="px-3.5 py-1.5 rounded-md text-xs font-medium font-mono transition-all"
+              style={{
+                backgroundColor: scope === s.value ? "var(--color-accent)" : "transparent",
+                color: scope === s.value ? "#000" : "var(--color-text-secondary)",
+              }}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Search bar */}
       <div className="flex gap-2">
@@ -273,7 +419,11 @@ export default function KnowledgeSearchPage() {
           </span>
           <input
             type="text"
-            placeholder="Ask a question, e.g. “why do our webhooks time out under load?”"
+            placeholder={
+              source === "internal"
+                ? "Ask a question, e.g. “why do our webhooks time out under load?”"
+                : "Search Stack Overflow, e.g. “react useEffect infinite loop”"
+            }
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && runSearch()}
@@ -287,11 +437,11 @@ export default function KnowledgeSearchPage() {
         </div>
         <button
           onClick={() => runSearch()}
-          disabled={!query.trim() || loading}
+          disabled={!query.trim() || busy}
           className="px-5 py-2.5 rounded-lg text-sm font-semibold font-display border transition-all hover:opacity-90 disabled:opacity-50"
           style={{ backgroundColor: "var(--color-accent)", borderColor: "var(--color-accent)", color: "#000" }}
         >
-          {loading ? "Searching..." : "Search"}
+          {busy ? "Searching..." : "Search"}
         </button>
       </div>
 
@@ -310,47 +460,53 @@ export default function KnowledgeSearchPage() {
             color: "var(--color-text-primary)",
           }}
         />
-        <div className="flex items-center gap-2">
-          <span className="eyebrow" style={{ color: "var(--color-text-muted)" }}>Sort</span>
-          <select
-            value={sort}
-            onChange={(e) => setSort(e.target.value as Sort)}
-            className="rounded-lg px-3 py-2 text-xs border outline-none focus:ring-1 transition-theme cursor-pointer"
-            style={{
-              backgroundColor: "var(--color-bg-input)",
-              borderColor: "var(--color-border)",
-              color: "var(--color-text-primary)",
-            }}
-          >
-            {SORTS.map((s) => (
-              <option key={s.value} value={s.value}>{s.label}</option>
-            ))}
-          </select>
-        </div>
+        {/* Sort re-orders the internal result list client-side; external
+            results arrive relevance-ranked, so hide it for those. */}
+        {source === "internal" && (
+          <div className="flex items-center gap-2">
+            <span className="eyebrow" style={{ color: "var(--color-text-muted)" }}>Sort</span>
+            <select
+              value={sort}
+              onChange={(e) => setSort(e.target.value as Sort)}
+              className="rounded-lg px-3 py-2 text-xs border outline-none focus:ring-1 transition-theme cursor-pointer"
+              style={{
+                backgroundColor: "var(--color-bg-input)",
+                borderColor: "var(--color-border)",
+                color: "var(--color-text-primary)",
+              }}
+            >
+              {SORTS.map((s) => (
+                <option key={s.value} value={s.value}>{s.label}</option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
-      {/* Category filter */}
-      <div className="flex gap-1 flex-wrap">
-        {CATEGORIES.map((c) => (
-          <button
-            key={c}
-            onClick={() => {
-              setCategory(c);
-              if (searched && query.trim()) runSearch();
-            }}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium font-mono transition-all ${
-              category === c ? "border" : "border opacity-70 hover:opacity-100"
-            }`}
-            style={{
-              backgroundColor: category === c ? "var(--color-accent-dim)" : "var(--color-bg-card)",
-              borderColor: category === c ? "var(--color-accent)" : "var(--color-border)",
-              color: category === c ? "var(--color-accent)" : "var(--color-text-secondary)",
-            }}
-          >
-            {c}
-          </button>
-        ))}
-      </div>
+      {/* Category filter — internal knowledge only */}
+      {source === "internal" && (
+        <div className="flex gap-1 flex-wrap">
+          {CATEGORIES.map((c) => (
+            <button
+              key={c}
+              onClick={() => {
+                setCategory(c);
+                if (searched && query.trim()) runSearch();
+              }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium font-mono transition-all ${
+                category === c ? "border" : "border opacity-70 hover:opacity-100"
+              }`}
+              style={{
+                backgroundColor: category === c ? "var(--color-accent-dim)" : "var(--color-bg-card)",
+                borderColor: category === c ? "var(--color-accent)" : "var(--color-border)",
+                color: category === c ? "var(--color-accent)" : "var(--color-text-secondary)",
+              }}
+            >
+              {c}
+            </button>
+          ))}
+        </div>
+      )}
 
       {error && (
         <div className="rounded-lg p-3 border text-sm" style={{ backgroundColor: "rgba(239,68,68,0.1)", borderColor: "var(--color-danger)", color: "var(--color-danger)" }}>
@@ -358,8 +514,9 @@ export default function KnowledgeSearchPage() {
         </div>
       )}
 
-      {/* AI answer panel — violet-accented, footnote-style citations */}
-      {searched && answerLoading && (
+      {/* AI answer panel — violet-accented, footnote-style citations.
+          Internal knowledge only; external sources link straight out. */}
+      {source === "internal" && searched && answerLoading && (
         <div
           className="relative overflow-hidden rounded-xl p-5 border animate-pulse"
           style={{ backgroundColor: "rgba(167,139,250,0.06)", borderColor: "var(--color-status-answered)" }}
@@ -377,7 +534,7 @@ export default function KnowledgeSearchPage() {
         </div>
       )}
 
-      {searched && !answerLoading && answer?.hasAnswer && answer.answer && (
+      {source === "internal" && searched && !answerLoading && answer?.hasAnswer && answer.answer && (
         <div
           className="relative overflow-hidden rounded-xl p-5 border"
           style={{ backgroundColor: "rgba(167,139,250,0.06)", borderColor: "var(--color-status-answered)" }}
@@ -424,8 +581,48 @@ export default function KnowledgeSearchPage() {
         </div>
       )}
 
-      {/* Results */}
-      {loading ? (
+      {/* Results — external sources render their own branch; internal keeps
+          the semantic-match list + AI answer above. The two never mix. */}
+      {source !== "internal" ? (
+        externalLoading ? (
+          <div className="text-sm text-center py-12" style={{ color: "var(--color-text-muted)" }}>
+            Searching Stack Overflow...
+          </div>
+        ) : !searched ? (
+          <div className="text-center py-12" style={{ color: "var(--color-text-muted)" }}>
+            <p className="text-sm mb-1" style={{ color: "var(--color-text-secondary)" }}>Search Stack Overflow for a problem</p>
+            <p className="text-xs">Public questions and answers — each result opens on Stack Overflow in a new tab</p>
+          </div>
+        ) : externalResult && !externalResult.configured ? (
+          <div className="text-center py-12">
+            <p className="text-sm mb-1" style={{ color: "var(--color-text-secondary)" }}>Stack Overflow isn't connected yet</p>
+            <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+              {externalResult.message || "This source needs to be configured on the server before it can be searched."}
+            </p>
+          </div>
+        ) : !externalResult || externalResult.items.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-sm mb-1" style={{ color: "var(--color-text-secondary)" }}>No results on Stack Overflow</p>
+            <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+              {externalResult?.message || "Try broader wording or different keywords."}
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-2.5">
+            <div className="flex items-center justify-between px-1">
+              <span className="text-xs font-mono" style={{ color: "var(--color-text-muted)" }}>
+                {externalResult.items.length} {externalResult.items.length === 1 ? "result" : "results"} on Stack Overflow
+              </span>
+              <span className="text-[10px] font-mono flex items-center gap-1" style={{ color: "var(--color-text-muted)" }}>
+                <Icon name="externalLink" size={11} /> opens in new tab
+              </span>
+            </div>
+            {externalResult.items.map((item) => (
+              <ExternalResultCard key={item.url} item={item} />
+            ))}
+          </div>
+        )
+      ) : loading ? (
         <div className="text-sm text-center py-12" style={{ color: "var(--color-text-muted)" }}>
           Searching knowledge base...
         </div>

@@ -19,6 +19,9 @@ public class KnowledgeController {
     @Autowired
     private KnowledgeService knowledgeService;
 
+    @Autowired
+    private ExternalKnowledgeService externalKnowledgeService;
+
     /**
      * Fetch a single knowledge item by ID.
      * Authorization: caller must be a member of the workspace,
@@ -83,6 +86,30 @@ public class KnowledgeController {
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String tags) {
         return ResponseEntity.ok(knowledgeService.browseGlobalRecent(category, tags));
+    }
+
+    /**
+     * Search an EXTERNAL knowledge source so developers can find related issues
+     * and solutions without leaving the app. Read-only proxy — any API key stays
+     * server-side (never shipped to the browser).
+     *
+     * <ul>
+     *   <li>{@code source=stackoverflow} (default): public Stack Overflow via the
+     *       Stack Exchange API. No onboarding required.</li>
+     *   <li>{@code source=sofa}: Stack Overflow for Agents, active only once
+     *       {@code SOFA_API_KEY} is configured; otherwise returns a
+     *       "not connected" result the UI can surface.</li>
+     * </ul>
+     *
+     * Two-segment literal path ({@code /external}) does not collide with
+     * {@code GET /{id}}. Auth is enforced by SecurityConfig ({@code anyRequest().authenticated()}).
+     */
+    @GetMapping("/external")
+    public ResponseEntity<ApiResponse<ExternalSearchResult>> externalSearch(
+            @RequestParam String q,
+            @RequestParam(required = false, defaultValue = "stackoverflow") String source,
+            @RequestParam(required = false) String tags) {
+        return ResponseEntity.ok(externalKnowledgeService.search(source, q, tags));
     }
 
     /**

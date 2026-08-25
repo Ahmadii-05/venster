@@ -16,6 +16,7 @@ import type {
   Notification,
   KnowledgeItem,
   KnowledgeAnswer,
+  ExternalSearchResult,
   GlobalQuestion,
   GlobalAnswer,
   UserSummary,
@@ -318,6 +319,15 @@ export const knowledgeApi = {
       method: "POST",
       body: JSON.stringify(params),
     }),
+  // Search an EXTERNAL source (public Stack Overflow now; SOFA once connected).
+  // The backend proxies the request and keeps any API key server-side. Returns
+  // an envelope so the UI can show "not connected"/"degraded" states cleanly.
+  externalSearch: (params: { q: string; source?: string; tags?: string }) => {
+    const q = new URLSearchParams({ q: params.q });
+    if (params.source) q.set("source", params.source);
+    if (params.tags) q.set("tags", params.tags);
+    return request<ExternalSearchResult>(`/api/knowledge/external?${q.toString()}`);
+  },
 };
 
 // ── Global Q&A ───────────────────────────────────────────────
