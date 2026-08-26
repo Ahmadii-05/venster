@@ -1,7 +1,7 @@
 package com.microhubs.config;
 
-import com.microhubs.security.JwtAuthFilter;
-import jakarta.servlet.http.HttpServletResponse;
+import java.util.Arrays;
+import java.util.List;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -16,13 +16,13 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-import java.util.Arrays;
-import java.util.List;
+import com.microhubs.security.JwtAuthFilter;
+
+import jakarta.servlet.http.HttpServletResponse;
 
 @Configuration
 @EnableWebSecurity
@@ -34,7 +34,7 @@ public class SecurityConfig {
 
     public SecurityConfig(
             JwtAuthFilter jwtAuthFilter,
-            @Value("${cors.allowed-origins:http://localhost:*,vscode-webview://*}")
+            @Value("${cors.allowed-origins:https://venster-frontendv2.vercel.app,http://localhost:*,http://localhost:5173,vscode-webview://*}")
             String corsAllowedOrigins) {
         this.jwtAuthFilter = jwtAuthFilter;
         this.corsAllowedOrigins = Arrays.stream(corsAllowedOrigins.split(","))
@@ -59,7 +59,6 @@ public class SecurityConfig {
 
         http
             .csrf(csrf -> csrf.disable())
-
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
 
             .sessionManagement(session -> session

@@ -26,7 +26,7 @@ import type {
 } from "../types";
 
 // ── Base URL from env ─────────────────────────────────────────
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8082";
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://venster-backend.onrender.com";
 
 // ── Auth state ────────────────────────────────────────────────
 // SECURITY NOTE: the JWT is persisted in localStorage, which is readable by
