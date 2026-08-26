@@ -23,7 +23,8 @@ spring:
         queue-capacity: 100
 
 server:
-  port: 8082
+  port: ${PORT:8082}
+address: 0.0.0.0
 
 jwt:
   secret: ${JWT_SECRET}

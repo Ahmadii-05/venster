@@ -28,7 +28,7 @@ services:
       LLM_API_KEY: ${LLM_API_KEY:?LLM_API_KEY must be set - see .env.example}
       LLM_BASE_URL: ${LLM_BASE_URL:-https://api.groq.com/openai/v1}
       # Optional Stack Exchange app key — raises the SO search quota (blank = anonymous).
-      STACKOVERFLOW_KEY: ${STACKOVERFLOW_KEY:-}
+      STACKOVERFLOW_KEY: ${STACKOVERFLOW_KEY:-rl_NYUoLMCpxDp846JXSWKucPvnT}
       # Stack Overflow for Agents — leave blank until onboarded; SOFA stays dormant.
       SOFA_API_KEY: ${SOFA_API_KEY:-}
     depends_on:

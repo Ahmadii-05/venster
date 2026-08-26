@@ -16,25 +16,30 @@ public interface CapsuleRepository extends JpaRepository<Capsule, UUID> {
 
     /**
      * Find capsules by project only.
+     * Uses JPQL with JOIN FETCH to eagerly load the full association graph
+     * (artifactAnchor → artifactVersion → artifact → project) so that
+     * Jackson can serialize the response after the transaction closes.
      */
-    @Query(value = "SELECT c.* FROM capsules c " +
-           "JOIN artifact_anchors aa ON c.artifact_anchor_id = aa.id " +
-           "JOIN artifact_versions av ON aa.artifact_version_id = av.id " +
-           "JOIN artifacts a ON av.artifact_id = a.id " +
-           "WHERE a.project_id = :projectId",
-           nativeQuery = true)
+    @Query("SELECT DISTINCT c FROM Capsule c " +
+           "JOIN FETCH c.artifactAnchor aa " +
+           "JOIN FETCH aa.artifactVersion av " +
+           "JOIN FETCH av.artifact a " +
+           "JOIN FETCH a.project p " +
+           "JOIN FETCH c.author " +
+           "WHERE p.id = :projectId")
     List<Capsule> findByProjectId(@Param("projectId") UUID projectId);
 
     /**
      * Find capsules by project + status.
      */
-    @Query(value = "SELECT c.* FROM capsules c " +
-           "JOIN artifact_anchors aa ON c.artifact_anchor_id = aa.id " +
-           "JOIN artifact_versions av ON aa.artifact_version_id = av.id " +
-           "JOIN artifacts a ON av.artifact_id = a.id " +
-           "WHERE a.project_id = :projectId " +
-           "AND c.status = :status",
-           nativeQuery = true)
+    @Query("SELECT DISTINCT c FROM Capsule c " +
+           "JOIN FETCH c.artifactAnchor aa " +
+           "JOIN FETCH aa.artifactVersion av " +
+           "JOIN FETCH av.artifact a " +
+           "JOIN FETCH a.project p " +
+           "JOIN FETCH c.author " +
+           "WHERE p.id = :projectId " +
+           "AND c.status = :status")
     List<Capsule> findByProjectIdAndStatus(
             @Param("projectId") UUID projectId,
             @Param("status") String status);
@@ -42,14 +47,15 @@ public interface CapsuleRepository extends JpaRepository<Capsule, UUID> {
     /**
      * Find capsules by project + status + assignee.
      */
-    @Query(value = "SELECT c.* FROM capsules c " +
-           "JOIN artifact_anchors aa ON c.artifact_anchor_id = aa.id " +
-           "JOIN artifact_versions av ON aa.artifact_version_id = av.id " +
-           "JOIN artifacts a ON av.artifact_id = a.id " +
-           "WHERE a.project_id = :projectId " +
+    @Query("SELECT DISTINCT c FROM Capsule c " +
+           "JOIN FETCH c.artifactAnchor aa " +
+           "JOIN FETCH aa.artifactVersion av " +
+           "JOIN FETCH av.artifact a " +
+           "JOIN FETCH a.project p " +
+           "JOIN FETCH c.author " +
+           "WHERE p.id = :projectId " +
            "AND c.status = :status " +
-           "AND (c.author_id = :assigneeId OR c.reviewer_id = :assigneeId)",
-           nativeQuery = true)
+           "AND (c.author.id = :assigneeId OR c.reviewer.id = :assigneeId)")
     List<Capsule> findByProjectIdStatusAndAssignee(
             @Param("projectId") UUID projectId,
             @Param("status") String status,
@@ -58,13 +64,14 @@ public interface CapsuleRepository extends JpaRepository<Capsule, UUID> {
     /**
      * Find capsules by project + assignee (no status filter).
      */
-    @Query(value = "SELECT c.* FROM capsules c " +
-           "JOIN artifact_anchors aa ON c.artifact_anchor_id = aa.id " +
-           "JOIN artifact_versions av ON aa.artifact_version_id = av.id " +
-           "JOIN artifacts a ON av.artifact_id = a.id " +
-           "WHERE a.project_id = :projectId " +
-           "AND (c.author_id = :assigneeId OR c.reviewer_id = :assigneeId)",
-           nativeQuery = true)
+    @Query("SELECT DISTINCT c FROM Capsule c " +
+           "JOIN FETCH c.artifactAnchor aa " +
+           "JOIN FETCH aa.artifactVersion av " +
+           "JOIN FETCH av.artifact a " +
+           "JOIN FETCH a.project p " +
+           "JOIN FETCH c.author " +
+           "WHERE p.id = :projectId " +
+           "AND (c.author.id = :assigneeId OR c.reviewer.id = :assigneeId)")
     List<Capsule> findByProjectIdAndAssignee(
             @Param("projectId") UUID projectId,
             @Param("assigneeId") UUID assigneeId);
