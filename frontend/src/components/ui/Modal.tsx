@@ -21,7 +21,7 @@ export default function Modal({ open, onClose, title, children, maxWidth = "540p
 
       {/* Modal */}
       <div
-        className="relative w-full rounded-2xl border shadow-2xl overflow-hidden animate-in"
+        className="relative w-full max-w-[calc(100vw-2rem)] rounded-2xl border shadow-2xl overflow-hidden animate-in"
         style={{
           maxWidth,
           backgroundColor: "var(--color-bg-card)",
@@ -31,7 +31,7 @@ export default function Modal({ open, onClose, title, children, maxWidth = "540p
       >
         {/* Header */}
         <div
-          className="flex items-center justify-between px-6 py-4 border-b"
+          className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b"
           style={{ borderColor: "var(--color-border)" }}
         >
           <h2 className="text-base font-semibold" style={{ color: "var(--color-text-primary)" }}>
@@ -47,7 +47,7 @@ export default function Modal({ open, onClose, title, children, maxWidth = "540p
         </div>
 
         {/* Body */}
-        <div className="px-6 py-5 max-h-[70vh] overflow-y-auto">{children}</div>
+        <div className="px-4 sm:px-6 py-4 sm:py-5 max-h-[70vh] overflow-y-auto overflow-x-hidden">{children}</div>
       </div>
 
       <style>{`

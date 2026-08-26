@@ -269,9 +269,9 @@ export default function CapsuleDetailPage() {
   const artifact = anchor?.artifactVersion?.artifact;
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-4">
+    <div className="p-4 sm:p-6 max-w-4xl mx-auto space-y-3 sm:space-y-4">
       {/* Header */}
-      <div className="flex items-start justify-between">
+      <div className="vs-capsule-header flex items-start justify-between gap-3">
         <div>
           <Link
             to={artifact ? `/projects/${artifact.project.id}` : "/"}
@@ -283,17 +283,17 @@ export default function CapsuleDetailPage() {
           <div className="text-[10px] uppercase tracking-widest font-mono mb-1" style={{ color: "var(--color-accent)" }}>
             CAPSULE
           </div>
-          <h1 className="text-xl font-bold" style={{ color: "var(--color-text-primary)" }}>
+          <h1 className="text-lg sm:text-xl font-bold min-w-0 truncate" style={{ color: "var(--color-text-primary)" }}>
             {capsule.title}
           </h1>
-          <p className="text-xs mt-1" style={{ color: "var(--color-text-muted)" }}>
+          <p className="text-xs mt-1 truncate" style={{ color: "var(--color-text-muted)" }}>
             Created by {capsule.author?.name || capsule.author?.email} •{" "}
             {new Date(capsule.createdAt).toLocaleString()}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="vs-capsule-actions flex items-center gap-1.5 sm:gap-2 shrink-0">
           <span
-            className="px-3 py-1 rounded-full text-xs font-medium"
+            className="px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-medium"
             style={{
               backgroundColor: STATUS_COLORS[capsule.status]?.bg || "var(--color-bg-input)",
               color: STATUS_COLORS[capsule.status]?.text || "var(--color-text-secondary)",
@@ -302,7 +302,7 @@ export default function CapsuleDetailPage() {
             {capsule.status.replace("_", " ")}
           </span>
           <span
-            className="px-2 py-0.5 rounded-full text-xs font-medium"
+            className="px-1.5 sm:px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-medium"
             style={{
               color: capsule.priority === "CRITICAL"
                 ? "var(--color-priority-high)"
@@ -317,7 +317,7 @@ export default function CapsuleDetailPage() {
           </span>
           <button
             onClick={openEditCapsule}
-            className="px-3 py-1 rounded-lg text-xs font-medium border transition-all hover:opacity-90"
+            className="px-2 sm:px-3 py-1 rounded-lg text-[10px] sm:text-xs font-medium border transition-all hover:opacity-90"
             style={{
               backgroundColor: "var(--color-bg-input)",
               borderColor: "var(--color-border)",

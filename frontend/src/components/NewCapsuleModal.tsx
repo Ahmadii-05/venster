@@ -279,7 +279,7 @@ export default function NewCapsuleModal({ open, onClose }: NewCapsuleModalProps)
           </div>
 
           {/* Symbol + Line Range */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label className={labelClass} style={{ color: "var(--color-text-secondary)" }}>
                 Symbol Name
@@ -337,7 +337,7 @@ export default function NewCapsuleModal({ open, onClose }: NewCapsuleModalProps)
           </div>
 
           {/* Priority + Visibility */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className={labelClass} style={{ color: "var(--color-text-secondary)" }}>
                 Priority

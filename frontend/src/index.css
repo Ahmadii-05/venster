@@ -78,12 +78,104 @@
 }
 
 /* ── Base styles ────────────────────────────────────────────── */
+html,
+body,
+#root {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
 body {
   background-color: var(--color-bg-primary);
   color: var(--color-text-primary);
   font-family: var(--font-body);
   letter-spacing: 0.005em;
   -webkit-font-smoothing: antialiased;
+}
+
+/* ── VS Code Webview responsive overrides ──────────────────── */
+/* At narrow widths the sidebar collapses to icons only and the
+   top bar wraps controls to prevent horizontal overflow. */
+@media (max-width: 640px) {
+  .vs-sidebar-wrapper {
+    width: 48px !important;
+  }
+  .vs-sidebar-wrapper .sidebar-label {
+    display: none;
+  }
+  .vs-topbar-search {
+    display: none;
+  }
+  .vs-topbar-actions {
+    gap: 0.25rem;
+  }
+  .vs-hero-buttons {
+    flex-direction: column;
+  }
+  .vs-page-header {
+    flex-direction: column;
+    align-items: flex-start !important;
+    gap: 0.75rem;
+  }
+  .vs-page-header > *:last-child {
+    align-self: flex-start;
+  }
+  .vs-stats-grid {
+    grid-template-columns: 1fr 1fr !important;
+  }
+  .vs-profile-stats {
+    grid-template-columns: 1fr !important;
+  }
+  .vs-workspace-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+  .vs-workspace-header > *:last-child {
+    align-self: flex-start;
+  }
+  .vs-capsule-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+  .vs-capsule-actions {
+    flex-wrap: wrap;
+  }
+  .vs-notif-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+  .vs-notif-actions {
+    align-self: flex-end;
+  }
+}
+
+@media (max-width: 480px) {
+  .vs-page-content {
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+  }
+  .vs-topbar-inner {
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
+  }
+  .vs-capsule-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .vs-workspace-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (min-width: 1280px) {
+  .vs-capsule-grid {
+    grid-template-columns: repeat(3, 1fr) !important;
+  }
 }
 
 /* Display face for headings + big numbers (the one bold type move) */

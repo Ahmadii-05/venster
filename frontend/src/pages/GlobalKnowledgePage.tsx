@@ -85,7 +85,7 @@ export default function GlobalKnowledgePage() {
     );
 
     return (
-      <div className="max-w-5xl mx-auto p-6">
+      <div className="max-w-5xl mx-auto p-4 sm:p-6">
         <button
           onClick={() => setSelected(null)}
           className="inline-flex items-center gap-1.5 text-xs font-mono font-medium mb-5 transition-all hover:opacity-80"
@@ -184,11 +184,11 @@ export default function GlobalKnowledgePage() {
   const busy = loading || initialLoading;
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
+    <div className="p-4 sm:p-6 max-w-5xl mx-auto space-y-4 sm:space-y-6">
       {/* Header */}
       <div>
         <div className="eyebrow mb-1.5">Community</div>
-        <h1 className="font-display text-2xl font-bold" style={{ color: "var(--color-text-primary)" }}>
+        <h1 className="font-display text-xl sm:text-2xl font-bold" style={{ color: "var(--color-text-primary)" }}>
           Community Insights
         </h1>
         <p className="text-sm mt-1.5 max-w-2xl leading-relaxed" style={{ color: "var(--color-text-secondary)" }}>
@@ -197,7 +197,7 @@ export default function GlobalKnowledgePage() {
       </div>
 
       {/* Search */}
-      <div className="flex gap-2">
+      <div className="flex flex-col sm:flex-row gap-2">
         <div className="relative flex-1">
           <span
             className="absolute left-3 top-1/2 -translate-y-1/2 font-mono text-sm select-none"
@@ -223,7 +223,7 @@ export default function GlobalKnowledgePage() {
         <button
           onClick={handleSearch}
           disabled={loading}
-          className="px-6 py-2.5 rounded-lg text-sm font-semibold font-display border transition-all hover:opacity-90 disabled:opacity-50"
+          className="px-5 sm:px-6 py-2.5 rounded-lg text-sm font-semibold font-display border transition-all hover:opacity-90 disabled:opacity-50 shrink-0"
           style={{ backgroundColor: "var(--color-accent)", borderColor: "var(--color-accent)", color: "#000" }}
         >
           {loading ? "Searching..." : "Search"}

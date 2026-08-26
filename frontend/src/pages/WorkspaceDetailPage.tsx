@@ -215,21 +215,21 @@ export default function WorkspaceDetailPage() {
   ] as const;
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
+    <div className="p-4 sm:p-6 max-w-5xl mx-auto space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between">
+      <div className="vs-workspace-header flex items-start justify-between gap-3">
         <div>
           <div className="text-[10px] uppercase tracking-widest font-mono mb-1" style={{ color: "var(--color-accent)" }}>
             WORKSPACE
           </div>
           <div className="flex items-center gap-3">
             <div
-              className="w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold"
+              className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center text-sm font-bold shrink-0"
               style={{ backgroundColor: "var(--color-accent-dim)", color: "var(--color-accent)" }}
             >
               {workspace?.name?.substring(0, 2).toUpperCase() || "W"}
             </div>
-            <h1 className="text-2xl font-bold" style={{ color: "var(--color-text-primary)" }}>
+            <h1 className="text-xl sm:text-2xl font-bold min-w-0 truncate" style={{ color: "var(--color-text-primary)" }}>
               {workspace?.name || "Workspace"}
             </h1>
           </div>
@@ -248,10 +248,10 @@ export default function WorkspaceDetailPage() {
               className="flex items-center gap-1.5 rounded-lg px-2 py-1 border transition-all hover:opacity-90"
               style={{ backgroundColor: "var(--color-bg-card)", borderColor: "var(--color-border)" }}
             >
-              <span className="text-[9px] uppercase tracking-widest font-mono" style={{ color: "var(--color-text-muted)" }}>
+              <span className="text-[9px] uppercase tracking-widest font-mono hidden sm:block" style={{ color: "var(--color-text-muted)" }}>
                 {copiedId ? "Copied" : "Key"}
               </span>
-              <code className="text-[11px] font-mono" style={{ color: "var(--color-text-secondary)" }}>
+              <code className="text-[11px] font-mono truncate max-w-[80px] sm:max-w-none" style={{ color: "var(--color-text-secondary)" }}>
                 {workspace.id}
               </code>
               <Icon
@@ -287,15 +287,13 @@ export default function WorkspaceDetailPage() {
         <div className="rounded-lg p-3 border text-sm" style={{ backgroundColor: "rgba(239,68,68,0.1)", borderColor: "var(--color-danger)", color: "var(--color-danger)" }}>
           {error}
         </div>
-      )}
-
-      {/* Tab bar */}
-      <div className="flex gap-1 border-b" style={{ borderColor: "var(--color-border)" }}>
+      )}        {/* Tab bar */}
+      <div className="flex gap-0.5 sm:gap-1 border-b overflow-x-auto" style={{ borderColor: "var(--color-border)" }}>
         {tabs.map((t) => (
           <button
             key={t.key}
             onClick={() => setActiveTab(t.key)}
-            className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-all"
+            className="flex items-center gap-1.5 px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium border-b-2 -mb-px transition-all shrink-0"
             style={{
               borderColor: activeTab === t.key ? "var(--color-accent)" : "transparent",
               color: activeTab === t.key ? "var(--color-accent)" : "var(--color-text-secondary)",
@@ -479,7 +477,7 @@ export default function WorkspaceDetailPage() {
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {projects.map((proj) => (
                 <Link
                   key={proj.id}

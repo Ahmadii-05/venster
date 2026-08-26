@@ -122,12 +122,12 @@ export default function NotificationsPage() {
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-6">
+    <div className="p-4 sm:p-6 max-w-4xl mx-auto space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between">
+      <div className="vs-page-header flex items-start justify-between gap-3">
         <div>
           <div className="eyebrow mb-1.5">Inbox</div>
-          <h1 className="font-display text-2xl font-bold" style={{ color: "var(--color-text-primary)" }}>
+          <h1 className="font-display text-xl sm:text-2xl font-bold" style={{ color: "var(--color-text-primary)" }}>
             Notifications
           </h1>
           <p className="text-sm mt-1" style={{ color: "var(--color-text-secondary)" }}>
@@ -177,7 +177,7 @@ export default function NotificationsPage() {
             return (
               <div
                 key={n.id}
-                className="relative overflow-hidden rounded-xl p-4 border transition-all flex items-start gap-4"
+                className="vs-notif-item relative overflow-hidden rounded-xl p-3 sm:p-4 border transition-all flex items-start gap-3 sm:gap-4"
                 style={{
                   backgroundColor: n.read ? "var(--color-bg-card)" : "var(--color-bg-elevated)",
                   borderColor: n.read ? "var(--color-border)" : "var(--color-accent)",
@@ -235,7 +235,7 @@ export default function NotificationsPage() {
                 </div>
 
                 {/* Actions */}
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="vs-notif-actions flex items-center gap-2 shrink-0">
                   {!n.read && (
                     <button
                       onClick={() => handleMarkAsRead(n.id)}

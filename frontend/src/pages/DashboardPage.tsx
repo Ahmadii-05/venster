@@ -193,10 +193,10 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="p-6 max-w-[1400px] mx-auto">
-      <div className="flex gap-6">
+    <div className="p-4 sm:p-6 max-w-[1400px] mx-auto">
+      <div className="flex gap-4 sm:gap-6">
         {/* ── Main Column ── */}
-        <div className="flex-1 min-w-0 space-y-6">
+        <div className="flex-1 min-w-0 space-y-4 sm:space-y-6">
 
           {/* 1. Hero band — leads with a sentence */}
           <div
@@ -213,33 +213,33 @@ export default function DashboardPage() {
               aria-hidden="true"
             />
             <div className="flex items-start justify-between gap-4 pl-3">
-              <div>
+              <div className="min-w-0">
                 <div className="eyebrow mb-2">Overview</div>
-                <h1 className="font-display text-[26px] leading-tight font-bold" style={{ color: "var(--color-text-primary)" }}>
+                <h1 className="font-display text-xl sm:text-[26px] leading-tight font-bold" style={{ color: "var(--color-text-primary)" }}>
                   {greeting}, {name}
                 </h1>
-                <p className="text-sm mt-2 max-w-md leading-relaxed" style={{ color: "var(--color-text-secondary)" }}>
+                <p className="text-xs sm:text-sm mt-2 max-w-md leading-relaxed" style={{ color: "var(--color-text-secondary)" }}>
                   Ask where you work, learn from everyone — capture the{" "}
                   <span className="font-mono font-medium" style={{ color: "var(--color-text-primary)" }}>why</span>{" "}
                   where the code lives.
                 </p>
               </div>
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="vs-hero-buttons flex items-center gap-2 shrink-0">
                 <button
                   onClick={() => setShowCreateWs(!showCreateWs)}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium border transition-all hover:opacity-80"
+                  className="flex items-center gap-1.5 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium border transition-all hover:opacity-80"
                   style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)", backgroundColor: "var(--color-bg-card)" }}
                 >
                   <Icon name="plus" size={14} />
-                  New Workspace
+                  <span className="hidden xs:inline">New Workspace</span>
                 </button>
                 <Link
                   to="/"
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium border transition-all hover:opacity-80"
+                  className="flex items-center gap-1.5 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium border transition-all hover:opacity-80"
                   style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)", backgroundColor: "var(--color-bg-card)" }}
                 >
                   <Icon name="externalLink" size={14} />
-                  Open Capsule board
+                  <span className="hidden sm:inline">Capsule board</span>
                 </Link>
               </div>
             </div>
@@ -278,7 +278,7 @@ export default function DashboardPage() {
           )}
 
           {/* 2. Four Stat Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="vs-stats-grid grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             <StatCard label="Open Capsules" value={stats.open} subtitle="Awaiting response" color="var(--color-status-open)" icon="lock" />
             <StatCard label="Replies Received" value={stats.replied} subtitle="Across all projects" color="var(--color-status-review)" icon="chat" />
             <StatCard label="Resolved This Week" value={stats.resolved} subtitle="Total resolved" color="var(--color-status-resolved)" icon="check" />
@@ -308,7 +308,7 @@ export default function DashboardPage() {
                 action={{ label: "+ New Capsule", onClick: () => navigate("/") }}
               />
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="vs-capsule-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                 {trending.map((cap) => (
                   <CapsuleCard
                     key={cap.id}
@@ -323,7 +323,7 @@ export default function DashboardPage() {
 
           {/* 4. Knowledge Health */}
           {knowledgeHealth && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
               {/* Aging Capsules */}
               <div
                 className="rounded-xl border p-5 transition-theme"
@@ -471,7 +471,7 @@ export default function DashboardPage() {
                 description="Knowledge items are created when capsules are resolved."
               />
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="vs-capsule-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                 {knowledgeItems.map((ki, i) => (
                   <KnowledgeCard key={ki.id} item={ki} index={i} onView={() => navigate("/knowledge")} />
                 ))}
@@ -481,7 +481,7 @@ export default function DashboardPage() {
         </div>
 
         {/* ── Right Sidebar ── */}
-        <aside className="w-72 shrink-0 space-y-5 hidden xl:block">
+        <aside className="w-60 xl:w-72 shrink-0 space-y-4 hidden lg:block">
           {/* Your Activity */}
           <div
             className="rounded-xl border p-5 transition-theme"

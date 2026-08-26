@@ -55,21 +55,21 @@ export default function ProfilePage() {
   }, [email]);
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
+    <div className="p-4 sm:p-6 max-w-5xl mx-auto space-y-4 sm:space-y-6">
       {/* Header Card */}
-      <div className="relative overflow-hidden rounded-xl p-6 pl-7 border transition-theme" style={{ backgroundColor: "var(--color-bg-card)", borderColor: "var(--color-border)" }}>
+      <div className="relative overflow-hidden rounded-xl p-4 sm:p-6 sm:pl-7 border transition-theme" style={{ backgroundColor: "var(--color-bg-card)", borderColor: "var(--color-border)" }}>
         <span className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ backgroundColor: "var(--color-accent)" }} aria-hidden="true" />
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
+        <div className="vs-page-header flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 sm:gap-4">
             <div
-              className="w-14 h-14 rounded-xl flex items-center justify-center text-xl font-bold font-display"
+              className="w-10 h-10 sm:w-14 sm:h-14 rounded-xl flex items-center justify-center text-lg sm:text-xl font-bold font-display shrink-0"
               style={{ backgroundColor: "var(--color-accent-dim)", color: "var(--color-accent)" }}
             >
               {initials}
             </div>
             <div>
               <div className="eyebrow mb-0.5">Account</div>
-              <h1 className="text-xl font-bold font-display" style={{ color: "var(--color-text-primary)" }}>
+              <h1 className="text-lg sm:text-xl font-bold font-display" style={{ color: "var(--color-text-primary)" }}>
                 {displayName}
               </h1>
               <p className="text-xs font-mono" style={{ color: "var(--color-text-muted)" }}>
@@ -87,7 +87,7 @@ export default function ProfilePage() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-3 gap-4 mt-6">
+        <div className="vs-profile-stats grid grid-cols-3 gap-3 sm:gap-4 mt-4 sm:mt-6">
           <div
             className="relative overflow-hidden rounded-lg p-3 pl-4 border text-center"
             style={{ backgroundColor: "var(--color-bg-input)", borderColor: "var(--color-border)" }}
@@ -96,7 +96,7 @@ export default function ProfilePage() {
             <div className="eyebrow mb-1" style={{ color: "var(--color-text-muted)" }}>
               Workspaces
             </div>
-            <div className="text-2xl font-bold font-mono" style={{ color: "var(--color-accent)" }}>
+            <div className="text-xl sm:text-2xl font-bold font-mono" style={{ color: "var(--color-accent)" }}>
               {workspaces.length}
             </div>
           </div>
@@ -108,7 +108,7 @@ export default function ProfilePage() {
             <div className="eyebrow mb-1" style={{ color: "var(--color-text-muted)" }}>
               Assigned
             </div>
-            <div className="text-2xl font-bold font-mono" style={{ color: "var(--color-status-review)" }}>
+            <div className="text-xl sm:text-2xl font-bold font-mono" style={{ color: "var(--color-status-review)" }}>
               {assignedCapsules.length}
             </div>
           </div>
@@ -120,7 +120,7 @@ export default function ProfilePage() {
             <div className="eyebrow mb-1" style={{ color: "var(--color-text-muted)" }}>
               Knowledge
             </div>
-            <div className="text-2xl font-bold font-mono" style={{ color: "var(--color-status-resolved)" }}>
+            <div className="text-xl sm:text-2xl font-bold font-mono" style={{ color: "var(--color-status-resolved)" }}>
               {knowledgeItems.length}
             </div>
           </div>

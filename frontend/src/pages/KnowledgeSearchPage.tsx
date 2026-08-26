@@ -534,11 +534,11 @@ export default function KnowledgeSearchPage() {
   const busy = loading || answerLoading;
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
+    <div className="p-4 sm:p-6 max-w-5xl mx-auto space-y-4 sm:space-y-6">
       {/* Header */}
       <div>
         <div className="eyebrow mb-1.5">Library</div>
-        <h1 className="font-display text-2xl font-bold" style={{ color: "var(--color-text-primary)" }}>
+        <h1 className="font-display text-xl sm:text-2xl font-bold" style={{ color: "var(--color-text-primary)" }}>
           Knowledge Search
         </h1>
         <p className="text-sm mt-1.5 max-w-2xl leading-relaxed" style={{ color: "var(--color-text-secondary)" }}>
@@ -547,7 +547,7 @@ export default function KnowledgeSearchPage() {
       </div>
 
       {/* Search bar */}
-      <div className="flex gap-2">
+      <div className="flex flex-col sm:flex-row gap-2">
         <div className="relative flex-1">
           <span
             className="absolute left-3 top-1/2 -translate-y-1/2 font-mono text-sm select-none"
@@ -573,7 +573,7 @@ export default function KnowledgeSearchPage() {
         <button
           onClick={() => runSearch()}
           disabled={!query.trim() || busy}
-          className="px-5 py-2.5 rounded-lg text-sm font-semibold font-display border transition-all hover:opacity-90 disabled:opacity-50"
+          className="px-5 py-2.5 rounded-lg text-sm font-semibold font-display border transition-all hover:opacity-90 disabled:opacity-50 shrink-0"
           style={{ backgroundColor: "var(--color-accent)", borderColor: "var(--color-accent)", color: "#000" }}
         >
           {busy ? "Searching..." : "Search"}
@@ -581,14 +581,14 @@ export default function KnowledgeSearchPage() {
       </div>
 
       {/* Filters row: tags + sort */}
-      <div className="flex flex-wrap gap-3 items-center">
+      <div className="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-3 items-stretch sm:items-center">
         <input
           type="text"
           placeholder="Filter by tags (comma-separated)…"
           value={tags}
           onChange={(e) => setTags(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && runSearch()}
-          className="flex-1 min-w-[200px] rounded-lg px-3 py-2 text-xs border outline-none focus:ring-1 focus:ring-[color:var(--color-accent)] transition-theme"
+          className="flex-1 min-w-0 sm:min-w-[200px] rounded-lg px-3 py-2 text-xs border outline-none focus:ring-1 focus:ring-[color:var(--color-accent)] transition-theme"
           style={{
             backgroundColor: "var(--color-bg-input)",
             borderColor: "var(--color-border)",

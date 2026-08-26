@@ -57,12 +57,12 @@ export default function GlobalQAPage() {
   }
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
+    <div className="p-4 sm:p-6 max-w-5xl mx-auto space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between">
+      <div className="vs-page-header flex items-start justify-between gap-3">
         <div>
           <div className="eyebrow mb-1.5">Community</div>
-          <h1 className="font-display text-2xl font-bold" style={{ color: "var(--color-text-primary)" }}>
+          <h1 className="font-display text-xl sm:text-2xl font-bold" style={{ color: "var(--color-text-primary)" }}>
             Community Q&amp;A
           </h1>
           <p className="text-sm mt-1" style={{ color: "var(--color-text-secondary)" }}>
@@ -71,7 +71,7 @@ export default function GlobalQAPage() {
         </div>
         <button
           onClick={() => setShowAsk(true)}
-          className="px-4 py-2 rounded-lg text-sm font-semibold font-display border transition-all hover:opacity-90"
+          className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold font-display border transition-all hover:opacity-90"
           style={{ backgroundColor: "var(--color-accent)", borderColor: "var(--color-accent)", color: "#000" }}
         >
           Ask a Question
@@ -268,7 +268,7 @@ function QuestionDetail({
   const isAuthor = currentUserEmail === question.author?.email;
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
+    <div className="p-4 sm:p-6 max-w-5xl mx-auto space-y-4 sm:space-y-6">
       <button onClick={onBack} className="inline-flex items-center gap-1.5 text-xs font-mono font-medium mb-4 transition-all hover:opacity-80" style={{ color: "var(--color-accent)" }}>
         <Icon name="arrowLeft" size={14} />
         Back to questions

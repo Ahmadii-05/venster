@@ -45,12 +45,12 @@ export default function WorkspacesListPage() {
   }
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
+    <div className="p-4 sm:p-6 max-w-5xl mx-auto space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="vs-page-header flex items-center justify-between gap-3">
         <div>
           <div className="eyebrow mb-1.5">Workspaces</div>
-          <h1 className="font-display text-2xl font-bold" style={{ color: "var(--color-text-primary)" }}>
+          <h1 className="font-display text-xl sm:text-2xl font-bold" style={{ color: "var(--color-text-primary)" }}>
             Workspaces
           </h1>
           <p className="text-sm mt-1" style={{ color: "var(--color-text-secondary)" }}>
@@ -104,7 +104,7 @@ export default function WorkspacesListPage() {
           action={{ label: "+ New Workspace", onClick: () => setShowCreate(true) }}
         />
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="vs-workspace-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           {workspaces.map((ws) => (
             <Link
               key={ws.id}

@@ -283,7 +283,7 @@ export default function ProjectDetailPage() {
   );
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
+    <div className="p-4 sm:p-6 max-w-5xl mx-auto space-y-4 sm:space-y-6">
       {/* Header */}
       <div>
         <div
@@ -292,17 +292,17 @@ export default function ProjectDetailPage() {
         >
           PROJECT
         </div>
-        <div className="flex items-center justify-between">
+        <div className="vs-page-header flex items-center justify-between gap-3">
           <h1
-            className="text-2xl font-bold"
+            className="text-xl sm:text-2xl font-bold min-w-0 truncate"
             style={{ color: "var(--color-text-primary)" }}
           >
             {projectName || "Project"} — Capsules
           </h1>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <button
               onClick={() => setShowCreate(!showCreate)}
-              className="px-4 py-2 rounded-lg text-sm font-medium transition-all hover:opacity-90"
+              className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all hover:opacity-90"
               style={{
                 backgroundColor: "var(--color-accent)",
                 color: "#000",
@@ -312,7 +312,7 @@ export default function ProjectDetailPage() {
             </button>
             <Link
               to="/"
-              className="text-xs font-medium transition-all hover:opacity-80"
+              className="text-xs font-medium transition-all hover:opacity-80 hidden sm:block"
               style={{ color: "var(--color-accent)" }}
             >
               ← Dashboard
