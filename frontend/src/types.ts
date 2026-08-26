@@ -185,10 +185,17 @@ export interface KnowledgeItem {
 // `citations` are stripped knowledge items (no resolution graph at runtime),
 // typed loosely as KnowledgeItem[] so they can open the same detail view.
 // When hasAnswer is false, `answer` is null but citations may still be present.
+//
+// `source` tells the UI what grounds the answer: "team" → the team's own
+// resolved issues (in `citations`); "stackoverflow" → public SO threads (in
+// `externalCitations`) used as a fallback when the team has no match; null →
+// no grounded answer. The inline [n] markers map to whichever list is active.
 export interface KnowledgeAnswer {
   hasAnswer: boolean;
   answer: string | null;
   citations: KnowledgeItem[];
+  source?: "team" | "stackoverflow" | null;
+  externalCitations?: ExternalKnowledgeItem[];
 }
 
 // ── External knowledge (Stack Overflow / SOFA search proxy) ──────

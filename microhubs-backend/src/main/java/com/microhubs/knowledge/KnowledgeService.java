@@ -32,6 +32,10 @@ public class KnowledgeService {
     private static final int MAX_SEARCH_RESULTS = 20;
     /** How many top-ranked entries are fed to the LLM as grounding for an AI answer. */
     private static final int ANSWER_CONTEXT_SIZE = 5;
+    /** When the team has no match, how many Stack Overflow threads back a fallback answer. */
+    private static final int EXTERNAL_ANSWER_CITATIONS = 3;
+    /** Max chars of each SO question/answer body fed to the model (keeps context tight). */
+    private static final int EXTERNAL_BODY_CHARS = 900;
 
     @Autowired
     private KnowledgeRepository knowledgeRepository;
@@ -53,6 +57,8 @@ public class KnowledgeService {
     private com.microhubs.capsule.CapsuleRepository capsuleRepo;
     @Autowired
     private com.microhubs.resolution.ResolutionRepository resolutionRepo;
+    @Autowired
+    private ExternalKnowledgeService externalKnowledgeService;
 
     /**
      * Event listener for CapsuleResolvedEvent.
@@ -345,7 +351,7 @@ public class KnowledgeService {
     public ApiResponse<KnowledgeAnswer> answerQuestion(
             String email, String query, String scope, String category, String tags) {
         if (query == null || query.isBlank()) {
-            return ApiResponse.success(new KnowledgeAnswer(false, null, java.util.Collections.emptyList()));
+            return ApiResponse.success(KnowledgeAnswer.none());
         }
 
         List<KnowledgeItem> found;
@@ -363,8 +369,11 @@ public class KnowledgeService {
                 .map(PublicKnowledgeItem::from)
                 .collect(Collectors.toList());
 
+        // No resolved issue on the team matches this question — fall back to public
+        // Stack Overflow so the user still gets a grounded answer (with the threads
+        // themselves as proof) instead of an empty panel.
         if (citations.isEmpty()) {
-            return ApiResponse.success(new KnowledgeAnswer(false, null, citations));
+            return ApiResponse.success(answerFromStackOverflow(query, tags));
         }
 
         String context = buildAnswerContext(citations);
@@ -374,12 +383,101 @@ public class KnowledgeService {
         } catch (Exception e) {
             // No key configured, provider down, etc. — still return the sources.
             log.warn("AI answer generation failed: {}", e.getMessage());
-            return ApiResponse.success(new KnowledgeAnswer(false, null, citations));
+            return ApiResponse.success(KnowledgeAnswer.none(citations));
         }
         if (answer == null || answer.isBlank()) {
-            return ApiResponse.success(new KnowledgeAnswer(false, null, citations));
+            return ApiResponse.success(KnowledgeAnswer.none(citations));
         }
-        return ApiResponse.success(new KnowledgeAnswer(true, answer.trim(), citations));
+        return ApiResponse.success(KnowledgeAnswer.team(answer.trim(), citations));
+    }
+
+    /**
+     * Fallback for when the team has no resolved issue matching the question:
+     * search public Stack Overflow, pull the question body + best answer for the
+     * top few threads, and have the LLM synthesize a grounded answer that cites
+     * them. The same threads are returned as {@code externalCitations} so the UI
+     * can show them as proof (and expand them inline).
+     *
+     * <p>Degrades gracefully at every step: if SO has no results, isn't reachable,
+     * yields no usable context, or the LLM is unconfigured/fails, this returns
+     * {@link KnowledgeAnswer#none()} and the UI falls back to "ask the team".
+     */
+    private KnowledgeAnswer answerFromStackOverflow(String query, String tags) {
+        ApiResponse<ExternalSearchResult> ext = externalKnowledgeService.search("stackoverflow", query, tags);
+        ExternalSearchResult result = ext.getData();
+        if (result == null || !result.configured() || result.items() == null || result.items().isEmpty()) {
+            return KnowledgeAnswer.none();
+        }
+
+        List<ExternalKnowledgeItem> top = result.items().stream()
+                .limit(EXTERNAL_ANSWER_CITATIONS)
+                .collect(Collectors.toList());
+
+        String context = buildExternalContext(top);
+        if (context.isBlank()) {
+            return KnowledgeAnswer.none();
+        }
+
+        String answer;
+        try {
+            answer = llmClient.answerFromExternal(query, context);
+        } catch (Exception e) {
+            // No key configured, provider down, etc.
+            log.warn("Stack Overflow-grounded AI answer failed: {}", e.getMessage());
+            return KnowledgeAnswer.none();
+        }
+        if (answer == null || answer.isBlank()) {
+            return KnowledgeAnswer.none();
+        }
+        return KnowledgeAnswer.external(answer.trim(), top);
+    }
+
+    /**
+     * Build a numbered context block from the top Stack Overflow threads: title +
+     * (when available) the question body and the accepted/top answer, each
+     * truncated to keep the model's context tight. The {@code [n]} numbers match
+     * the {@code externalCitations} the LLM is told to cite.
+     */
+    private String buildExternalContext(List<ExternalKnowledgeItem> items) {
+        StringBuilder sb = new StringBuilder();
+        int i = 1;
+        for (ExternalKnowledgeItem it : items) {
+            sb.append("[").append(i++).append("] ").append(nullSafe(it.title())).append("\n");
+            if (it.url() != null && !it.url().isBlank()) {
+                sb.append("URL: ").append(it.url()).append("\n");
+            }
+            // Enrich with the actual question body + best answer when we can fetch it.
+            if (it.id() != null && !it.id().isBlank()) {
+                try {
+                    ExternalKnowledgeDetail detail =
+                            externalKnowledgeService.detail("stackoverflow", it.id()).getData();
+                    if (detail != null) {
+                        if (detail.body() != null && !detail.body().isBlank()) {
+                            sb.append("Question: ").append(truncate(detail.body(), EXTERNAL_BODY_CHARS)).append("\n");
+                        }
+                        List<ExternalKnowledgeDetail.ExternalAnswer> answers = detail.answers();
+                        if (answers != null && !answers.isEmpty()) {
+                            answers.stream()
+                                    .filter(ExternalKnowledgeDetail.ExternalAnswer::accepted)
+                                    .findFirst()
+                                    .or(() -> answers.stream().findFirst())
+                                    .ifPresent(best -> sb.append("Top answer: ")
+                                            .append(truncate(best.body(), EXTERNAL_BODY_CHARS)).append("\n"));
+                        }
+                    }
+                } catch (Exception e) {
+                    log.debug("SO detail enrich failed for id {}: {}", it.id(), e.getMessage());
+                }
+            }
+            sb.append("\n");
+        }
+        return sb.toString().trim();
+    }
+
+    private static String truncate(String s, int max) {
+        if (s == null) return "";
+        String t = s.trim();
+        return t.length() <= max ? t : t.substring(0, max) + "...";
     }
 
     /**

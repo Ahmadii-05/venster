@@ -28,6 +28,7 @@ export default function WorkspaceDetailPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [members, setMembers] = useState<WorkspaceMember[]>([]);
   const [membersError, setMembersError] = useState(false);
+  const [copiedId, setCopiedId] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>("projects");
   const [loading, setLoading] = useState(true);
   const [showCreateProject, setShowCreateProject] = useState(false);
@@ -197,6 +198,17 @@ export default function WorkspaceDetailPage() {
       </div>
     );
 
+  const copyWorkspaceId = async () => {
+    if (!workspace?.id || !navigator.clipboard) return;
+    try {
+      await navigator.clipboard.writeText(workspace.id);
+      setCopiedId(true);
+      setTimeout(() => setCopiedId(false), 1500);
+    } catch {
+      /* clipboard unavailable — ignore */
+    }
+  };
+
   const tabs = [
     { key: "projects", label: "Projects", icon: "folder", count: projects.length },
     { key: "members", label: "Members", icon: "user", count: members.length },
@@ -225,24 +237,49 @@ export default function WorkspaceDetailPage() {
             Manage projects and members for this workspace.
           </p>
         </div>
-        <div className="flex gap-2">
-          {activeTab === "members" ? (
+        <div className="flex flex-col items-end gap-2 shrink-0">
+          {/* Workspace unique key — surfaced only once you're inside the workspace. */}
+          {workspace?.id && (
             <button
-              onClick={() => setShowAddMember((v) => !v)}
-              className="px-3 py-1.5 rounded-lg text-xs font-medium border transition-all hover:opacity-90"
-              style={{ backgroundColor: "var(--color-accent)", borderColor: "var(--color-accent)", color: "#000" }}
+              type="button"
+              onClick={copyWorkspaceId}
+              title="Copy workspace key"
+              aria-label="Copy workspace key"
+              className="flex items-center gap-1.5 rounded-lg px-2 py-1 border transition-all hover:opacity-90"
+              style={{ backgroundColor: "var(--color-bg-card)", borderColor: "var(--color-border)" }}
             >
-              + Add Member
-            </button>
-          ) : (
-            <button
-              onClick={() => setShowCreateProject((v) => !v)}
-              className="px-3 py-1.5 rounded-lg text-xs font-medium border transition-all hover:opacity-90"
-              style={{ backgroundColor: "var(--color-accent)", borderColor: "var(--color-accent)", color: "#000" }}
-            >
-              + New Project
+              <span className="text-[9px] uppercase tracking-widest font-mono" style={{ color: "var(--color-text-muted)" }}>
+                {copiedId ? "Copied" : "Key"}
+              </span>
+              <code className="text-[11px] font-mono" style={{ color: "var(--color-text-secondary)" }}>
+                {workspace.id}
+              </code>
+              <Icon
+                name={copiedId ? "check" : "copy"}
+                size={12}
+                style={{ color: copiedId ? "var(--color-accent)" : "var(--color-text-muted)" }}
+              />
             </button>
           )}
+          <div className="flex gap-2">
+            {activeTab === "members" ? (
+              <button
+                onClick={() => setShowAddMember((v) => !v)}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium border transition-all hover:opacity-90"
+                style={{ backgroundColor: "var(--color-accent)", borderColor: "var(--color-accent)", color: "#000" }}
+              >
+                + Add Member
+              </button>
+            ) : (
+              <button
+                onClick={() => setShowCreateProject((v) => !v)}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium border transition-all hover:opacity-90"
+                style={{ backgroundColor: "var(--color-accent)", borderColor: "var(--color-accent)", color: "#000" }}
+              >
+                + New Project
+              </button>
+            )}
+          </div>
         </div>
       </div>
 

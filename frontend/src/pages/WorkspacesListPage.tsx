@@ -133,8 +133,7 @@ export default function WorkspacesListPage() {
                   </div>
                 </div>
               </div>
-              <div className="flex items-center justify-between text-[10px] font-mono" style={{ color: "var(--color-text-muted)" }}>
-                <span>{ws.id.substring(0, 8)}</span>
+              <div className="flex items-center justify-end text-[10px] font-mono" style={{ color: "var(--color-text-muted)" }}>
                 <span>{timeAgo(ws.createdAt)}</span>
               </div>
             </Link>

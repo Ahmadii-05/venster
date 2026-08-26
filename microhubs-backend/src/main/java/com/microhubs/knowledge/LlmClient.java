@@ -46,4 +46,21 @@ public interface LlmClient {
      * @throws LlmException if the provider is unconfigured or the call fails
      */
     String answerQuestion(String question, String context) throws LlmException;
+
+    /**
+     * Answer a developer's question using ONLY the supplied public Stack Overflow
+     * threads (numbered, each with the question body and best answer). Used as a
+     * fallback when the caller's team has no resolved issue matching the question.
+     *
+     * <p>Implementations must instruct the model to ground its answer in the
+     * provided threads, cite them inline as {@code [1]}, {@code [2]}, ... and admit
+     * when the threads don't cover the question rather than inventing an answer.
+     * The return value is plain text (no JSON, no markdown fences).
+     *
+     * @param question the user's question
+     * @param context  numbered Stack Overflow threads, each prefixed with {@code [n]}
+     * @return a concise, plain-text answer that cites threads as {@code [n]}
+     * @throws LlmException if the provider is unconfigured or the call fails
+     */
+    String answerFromExternal(String question, String context) throws LlmException;
 }

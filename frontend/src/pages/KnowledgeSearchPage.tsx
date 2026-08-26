@@ -95,7 +95,7 @@ function CodeAwareText({ text }: { text: string }) {
 // and shows them right here, so the user never has to leave the app. A subtle
 // "view full thread" link into the source stays available in the expanded panel.
 // Left bar goes green when the question is answered (resolved-status color).
-function ExternalResultCard({ item }: { item: ExternalKnowledgeItem }) {
+function ExternalResultCard({ item, citationNumber }: { item: ExternalKnowledgeItem; citationNumber?: number }) {
   const [expanded, setExpanded] = useState(false);
   const [detail, setDetail] = useState<ExternalKnowledgeDetail | null>(null);
   const [loading, setLoading] = useState(false);
@@ -144,6 +144,9 @@ function ExternalResultCard({ item }: { item: ExternalKnowledgeItem }) {
       >
         <div className="flex items-start justify-between gap-3">
           <h3 className="font-display text-sm font-semibold leading-snug" style={{ color: "var(--color-text-primary)" }}>
+            {typeof citationNumber === "number" && (
+              <span className="font-mono mr-1.5" style={{ color: "var(--color-status-answered)" }}>[{citationNumber}]</span>
+            )}
             {item.title}
           </h3>
           <Icon
@@ -382,6 +385,21 @@ export default function KnowledgeSearchPage() {
     }
     return arr;
   }, [results, sort]);
+
+  // When the AI answer is grounded in Stack Overflow, its cited threads render as
+  // expandable "Sources" inside the answer panel. Filter those same threads out of
+  // the broader "Similar issues" list below so nothing is shown twice.
+  const citedExternalUrls = useMemo(
+    () =>
+      answer?.source === "stackoverflow"
+        ? new Set((answer.externalCitations ?? []).map((c) => c.url))
+        : new Set<string>(),
+    [answer]
+  );
+  const similarExternalItems = useMemo(
+    () => (externalResult?.items ?? []).filter((it) => !citedExternalUrls.has(it.url)),
+    [externalResult, citedExternalUrls]
+  );
 
   // ── Detail view: doc column + provenance rail ──────────────
   if (selected) {
@@ -657,13 +675,35 @@ export default function KnowledgeSearchPage() {
             <span className="text-[10.5px] font-mono font-semibold uppercase tracking-[0.18em]" style={{ color: "var(--color-status-answered)" }}>
               AI Answer
             </span>
+            {answer.source === "stackoverflow" && (
+              <span
+                className="text-[9px] font-mono font-semibold uppercase tracking-[0.14em] px-1.5 py-0.5 rounded flex items-center gap-1"
+                style={{ backgroundColor: "var(--color-bg-card)", color: "var(--color-text-muted)" }}
+              >
+                <Icon name="globe" size={9} /> via Stack Overflow
+              </span>
+            )}
           </div>
           <p className="text-sm whitespace-pre-wrap pl-2 leading-relaxed" style={{ color: "var(--color-text-primary)" }}>
             {answer.answer}
           </p>
 
+          {/* A Stack Overflow-sourced answer cites public threads — surface them here
+              as expandable proof: the question body + top answers open inline, so the
+              user never leaves the app. [n] matches the citations in the answer above. */}
+          {answer.source === "stackoverflow" && answer.externalCitations && answer.externalCitations.length > 0 && (
+            <div className="mt-4 pl-2 space-y-2">
+              <div className="eyebrow" style={{ color: "var(--color-text-muted)" }}>Sources · click to expand</div>
+              {answer.externalCitations.map((c, i) => (
+                <ExternalResultCard key={c.url} item={c} citationNumber={i + 1} />
+              ))}
+            </div>
+          )}
+
           <p className="text-[10px] font-mono mt-3 pl-2" style={{ color: "var(--color-text-muted)" }}>
-            Generated from your team's resolved issues. Verify before relying on it.
+            {answer.source === "stackoverflow"
+              ? "Synthesized from public Stack Overflow threads — your team hasn't resolved this yet. Verify before relying on it."
+              : "Generated from your team's resolved issues. Verify before relying on it."}
           </p>
         </div>
       )}
@@ -728,13 +768,14 @@ export default function KnowledgeSearchPage() {
             </div>
           )}
 
-          {/* Stack Overflow references — similar issues, listed one by one */}
+          {/* Stack Overflow references — similar issues, listed one by one.
+              Threads already shown as answer "Sources" above are filtered out. */}
           <div className="space-y-2.5">
             <div className="flex items-center justify-between px-1">
               <span className="eyebrow flex items-center gap-1.5" style={{ color: "var(--color-text-muted)" }}>
                 <Icon name="globe" size={12} /> Similar issues on Stack Overflow
               </span>
-              {!externalLoading && externalResult && externalResult.configured && externalResult.items.length > 0 && (
+              {!externalLoading && externalResult && externalResult.configured && similarExternalItems.length > 0 && (
                 <span className="text-[10px] font-mono flex items-center gap-1" style={{ color: "var(--color-text-muted)" }}>
                   <Icon name="chevronRight" size={11} /> click to expand
                 </span>
@@ -744,14 +785,16 @@ export default function KnowledgeSearchPage() {
               <div className="text-sm py-6 text-center" style={{ color: "var(--color-text-muted)" }}>
                 Finding similar issues on Stack Overflow…
               </div>
-            ) : externalResult && externalResult.configured && externalResult.items.length > 0 ? (
-              externalResult.items.map((item) => (
+            ) : externalResult && externalResult.configured && similarExternalItems.length > 0 ? (
+              similarExternalItems.map((item) => (
                 <ExternalResultCard key={item.url} item={item} />
               ))
             ) : (
               <p className="text-xs px-1 pb-2" style={{ color: "var(--color-text-muted)" }}>
                 {externalResult && !externalResult.configured
                   ? externalResult.message || "Stack Overflow isn't connected on the server."
+                  : citedExternalUrls.size > 0
+                  ? "The cited sources above are the closest Stack Overflow matches."
                   : "No similar Stack Overflow threads found."}
               </p>
             )}

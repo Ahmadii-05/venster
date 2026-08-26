@@ -201,4 +201,69 @@ public class OpenAiLlmClient implements LlmClient {
             throw new LlmException("LLM answer call failed: " + e.getMessage(), e);
         }
     }
+
+    @Override
+    public String answerFromExternal(String question, String context) throws LlmException {
+        if (apiKey == null || apiKey.isBlank()) {
+            throw new LlmException("LLM API key not configured (LLM_API_KEY env var)");
+        }
+
+        String systemPrompt = """
+                You are a senior software engineer helping a teammate. Their own team has
+                NOT resolved this issue before, so you are answering using ONLY the numbered
+                public Stack Overflow threads below. Each thread gives the question and its
+                best (often accepted) answer.
+
+                Rules:
+                - Answer concisely and practically, in plain prose. No markdown headings.
+                - Base your answer ONLY on the provided threads. Do not invent facts, APIs,
+                  versions, or file names that are not supported by them.
+                - Cite the threads you rely on inline, like [1] or [2], matching their
+                  numbers. Cite every claim that comes from a thread.
+                - If the threads do NOT contain enough information to answer, say so plainly
+                  in one sentence. Do not guess.
+                - Keep it under ~180 words.
+                """;
+
+        String userContent = "Question:\n" + question + "\n\nStack Overflow threads:\n" + context;
+
+        String requestBody;
+        try {
+            requestBody = mapper.writeValueAsString(new Object() {
+                public final String model = OpenAiLlmClient.this.model;
+                public final int max_tokens = 700;
+                public final double temperature = 0.2;
+                public final Object[] messages = new Object[]{
+                        new Object() { public final String role = "system"; public final String content = systemPrompt; },
+                        new Object() { public final String role = "user"; public final String content = userContent; }
+                };
+            });
+        } catch (Exception e) {
+            throw new LlmException("Failed to build request", e);
+        }
+
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(baseUrl + "/chat/completions"))
+                    .header("Authorization", "Bearer " + apiKey)
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() != 200) {
+                throw new LlmException("LLM API returned status " + response.statusCode() + ": " + response.body());
+            }
+
+            JsonNode root = mapper.readTree(response.body());
+            String content = root.path("choices").get(0).path("message").path("content").asText();
+            return content == null ? "" : content.trim();
+
+        } catch (LlmException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new LlmException("LLM external answer call failed: " + e.getMessage(), e);
+        }
+    }
 }
