@@ -61,4 +61,7 @@ public class ProjectRequest {
 
     public LocalDate getTargetDate() { return targetDate; }
     public void setTargetDate(LocalDate targetDate) { this.targetDate = targetDate; }
+
+    public List<UUID> getMemberIds() { return memberIds; }
+    public void setMemberIds(List<UUID> memberIds) { this.memberIds = memberIds; }
 }

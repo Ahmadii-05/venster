@@ -3,6 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import Logo from "../components/ui/Logo";
+import BackButton from "../components/ui/BackButton";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -32,6 +33,9 @@ export default function LoginPage() {
       className="min-h-screen flex items-center justify-center transition-theme"
       style={{ backgroundColor: "var(--color-bg-primary)" }}
     >
+      {/* Back to previous screen (self-hides on a fresh session — login is the entry point) */}
+      <BackButton className="fixed top-4 left-4" />
+
       {/* Theme toggle */}
       <button
         onClick={toggleTheme}

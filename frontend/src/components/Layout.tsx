@@ -7,6 +7,7 @@ import { isInVsCode } from "../services/vscodeBridge";
 import type { Notification } from "../types";
 import NewCapsuleModal from "./NewCapsuleModal";
 import Avatar from "./ui/Avatar";
+import BackButton from "./ui/BackButton";
 import Icon from "./ui/Icon";
 import Logo from "./ui/Logo";
 
@@ -181,6 +182,9 @@ export default function Layout({ children }: { children: ReactNode }) {
             borderColor: "var(--color-border)",
           }}
         >
+          {/* Back to previous screen */}
+          <BackButton fallback="/" />
+
           {/* Search */}
           <div className="flex-1 max-w-xl">
             <div className="relative">
